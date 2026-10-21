@@ -1,0 +1,5 @@
+reporting_date,activity_id,activity_name,activity_budget,planned_progress_pct,actual_progress_pct,ac_cumulative,notes
+2026-01-31,WP1,Substructure,8000000,100,100,8400000,Example rows - every WP must appear at every reporting date
+2026-01-31,WP2,Superstructure,16000000,40,30,5200000,
+2026-02-28,WP1,Substructure,8000000,100,100,8400000,
+2026-02-28,WP2,Superstructure,16000000,70,55,9800000,

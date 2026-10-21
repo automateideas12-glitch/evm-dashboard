@@ -1,0 +1,8 @@
+# Tested combinations (both: full test suite passed, 79 tests, Python 3.13):
+#   streamlit 1.66.0, pandas 3.0.5, plotly 7.1.0, openpyxl 3.1.5
+#   streamlit 1.50.0, pandas 2.2.3, plotly 5.24.1, openpyxl 3.1.5
+streamlit>=1.50
+pandas>=2.2
+plotly>=5.24
+openpyxl>=3.1
+pytest>=8
