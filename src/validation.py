@@ -73,7 +73,7 @@ class ValidationReport:
 
     def to_frame(self) -> pd.DataFrame:
         order = {ERROR: 0, WARNING: 1, INFO: 2}
-        rows = [{"Severity": i.severity.upper(), "Row": i.row if i.row is not None else "",
+        rows = [{"Severity": i.severity.upper(), "Row": str(i.row) if i.row is not None else "",
                  "Field": i.field or "", "Problem": i.message, "How to resolve": i.fix}
                 for i in sorted(self.issues, key=lambda x: (order[x.severity], x.row or 0))]
         return pd.DataFrame(rows, columns=["Severity", "Row", "Field", "Problem", "How to resolve"])

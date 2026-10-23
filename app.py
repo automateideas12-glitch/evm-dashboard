@@ -100,6 +100,14 @@ def demo_project() -> dict:
     return make_current(p, "Demo project — synthetic data")
 
 
+def real_project() -> dict:
+    s = ProjectSettings(project_type="Building — residential", currency="EUR",
+                        baseline_start=datetime(2011, 10, 3).date(), baseline_finish=datetime(2012, 8, 15).date(),
+                        reporting_frequency="Irregular")
+    p = load_dataset(DATA / "real" / "C2014-05_apartment_building_work_packages.csv", "work_package", s, "real")
+    return make_current(p, "REAL project data — DSLIB C2014-05 (Batselier & Vanhoucke, 2015)")
+
+
 def benchmark_project() -> dict:
     s = ProjectSettings(project_type="Building — residential", baseline_start=datetime(2025, 10, 1).date(),
                         baseline_finish=datetime(2026, 9, 30).date())
@@ -132,7 +140,8 @@ with st.sidebar:
                           help="Each method makes a different assumption about future performance. "
                                "See the Forecasts tab to compare them.")
     st.caption(METHODS[method]["assumption"])
-    unit = st.selectbox("Show money in", ["units", "lakh", "crore", "million"], index=1,
+    unit = st.selectbox("Show money in", ["units", "lakh", "crore", "million"],
+                        index=1 if S.currency == "INR" else 0,
                         format_func=lambda u: {"units": f"{S.currency} (full)", "lakh": f"{S.currency} lakh",
                                                "crore": f"{S.currency} crore", "million": f"{S.currency} million"}[u],
                         help="Display only. Calculations always use full precision.")
@@ -170,7 +179,11 @@ st.markdown(f"""
       {S.project_type} &nbsp;|&nbsp; Forecast method {method[0]}: {METHODS[method]['short']}</div>
   </div>
 </div>""", unsafe_allow_html=True)
-if "synthetic" in cur["label"].lower():
+if cur["label"].startswith("REAL"):
+    st.markdown('<div class="demo-note">Real project data from the DSLIB empirical project database '
+                '(Batselier &amp; Vanhoucke, 2015), values in EUR. Results reproduce the EVM values recorded '
+                'in ProTrack for every tracking period.</div>', unsafe_allow_html=True)
+elif "synthetic" in cur["label"].lower():
     st.markdown('<div class="demo-note">You are viewing an illustrative project built from synthetic data. '
                 'Load your own data in the <b>Data</b> tab.</div>', unsafe_allow_html=True)
 
@@ -580,13 +593,19 @@ with t_data:
             confirm_and_load(p, "Manually entered data", "man")
 
     else:
-        st.caption("Both examples use SYNTHETIC illustrative data.")
+        st.caption("The demo and benchmark use SYNTHETIC data. The real project is an actual Belgian apartment "
+                   "building from the DSLIB empirical project database (Ghent University): 25 activities, "
+                   "13 tracking periods, values in EUR. Source: Batselier & Vanhoucke (2015), International "
+                   "Journal of Project Management 33(3), 697–710.")
         ex = st.radio("Example", ["Demo project — G+7 commercial building, 6 work packages, 9 months",
                                   "Benchmark case — G+4 residential block, 4 work packages, 2 months "
-                                  "(used for manual validation)"], key="example")
+                                  "(used for manual validation)",
+                                  "Real project — apartment building, Belgium 2011–12 (DSLIB C2014-05)"],
+                      key="example")
         ok = st.checkbox(f"Replace the project currently shown (“{S.name}”)", key="ex_conf")
         if st.button("Load example", type="primary", disabled=not ok):
-            st.session_state.current = demo_project() if ex.startswith("Demo") else benchmark_project()
+            st.session_state.current = (demo_project() if ex.startswith("Demo") else
+                                        real_project() if ex.startswith("Real") else benchmark_project())
             st.session_state.flash = "Example loaded."
             st.rerun()
 
