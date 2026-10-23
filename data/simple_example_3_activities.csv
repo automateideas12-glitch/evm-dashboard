@@ -1,0 +1,10 @@
+project_name,reporting_date,activity_id,activity_name,activity_budget,planned_progress_pct,actual_progress_pct,ac_cumulative,notes
+Simple G+2 house (SYNTHETIC),2026-01-31,A1,Foundation,1000000,100,80,900000,
+Simple G+2 house (SYNTHETIC),2026-01-31,A2,RCC structure,2000000,20,10,250000,
+Simple G+2 house (SYNTHETIC),2026-01-31,A3,Finishing,1000000,0,0,0,Not started yet
+Simple G+2 house (SYNTHETIC),2026-02-28,A1,Foundation,1000000,100,100,1050000,Foundation completed
+Simple G+2 house (SYNTHETIC),2026-02-28,A2,RCC structure,2000000,50,40,880000,
+Simple G+2 house (SYNTHETIC),2026-02-28,A3,Finishing,1000000,0,0,0,
+Simple G+2 house (SYNTHETIC),2026-03-31,A1,Foundation,1000000,100,100,1050000,No change - finished in Feb
+Simple G+2 house (SYNTHETIC),2026-03-31,A2,RCC structure,2000000,80,70,1520000,
+Simple G+2 house (SYNTHETIC),2026-03-31,A3,Finishing,1000000,20,10,120000,

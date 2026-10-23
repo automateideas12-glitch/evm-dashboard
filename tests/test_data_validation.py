@@ -279,3 +279,14 @@ def test_manual_entry_and_upload_give_identical_results():
     rm, ru = compute_results(pm.periods, pm.bac), compute_results(pu.periods, pu.bac)
     num = [c for c in rm.columns if "__" not in c and c != "reporting_date"]
     pd.testing.assert_frame_equal(rm[num], ru[num])
+
+
+def test_activity_file_in_project_mode_gives_one_clear_error():
+    """An activity-level file uploaded as project-level data must not be read as one period per row."""
+    rows = dict(WP, activity_name=["Found", "Frame", "Found", "Frame"])
+    for mode in ("progress", "precalc"):
+        p = run(rows, mode=mode)
+        assert not p.ok and p.periods is None
+        assert len(p.report.errors) == 1 and not p.report.warnings
+        assert "Work-Package-Level Data" in p.report.errors[0].fix
+    assert run(WP, mode="work_package", settings=ProjectSettings(name="x")).ok

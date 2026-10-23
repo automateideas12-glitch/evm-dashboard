@@ -272,6 +272,19 @@ def prepare(raw: pd.DataFrame, mapping: Dict[str, Optional[str]], settings: Proj
                         "PV and EV are derived from progress and budget instead.", field="pv_cumulative",
                         fix="Switch to 'Pre-calculated EVM Data' mode to use supplied PV/EV values.")
         rep.info(f"Column(s) not used by the tool (not interpreted): {unmapped}.")
+    # --- wrong mode: an activity-level file uploaded as project-level data.
+    # Without this check every activity row is read as a separate reporting period,
+    # producing many misleading "duplicate date" and "decreasing value" messages.
+    if mode != "work_package":
+        wp_map = suggest_mapping([c for c in raw.columns], "work_package")
+        if wp_map.get("activity_id") and wp_map.get("activity_budget"):
+            rep.issues.clear()
+            rep.error(f"This file has one row per activity (columns '{wp_map['activity_id']}' and "
+                      f"'{wp_map['activity_budget']}'), but '{MODES[mode]}' expects one row per reporting date.",
+                      field="data type",
+                      fix="In step 1 ('What kind of data do you have?') choose 'Work-Package-Level Data', "
+                          "then upload the same file again.")
+            return out
     if rep.has_blocking_errors:
         return out
 
