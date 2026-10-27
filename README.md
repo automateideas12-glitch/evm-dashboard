@@ -16,7 +16,7 @@ streamlit run app.py
 
 **Hosted version (Streamlit Community Cloud):** deploy this repository with main file `streamlit_app.py` (it simply runs `app.py`). Data uploaded to the hosted version is processed on Streamlit's servers, so use synthetic or non-confidential data there.
 
-The browser opens at <http://localhost:8501> on a **home screen**: upload a CSV/XLSX, enter data manually, or open an example project in one click. The full analysis (Overview, Trends, Forecasts, Commentary, Data) opens once a project is loaded; the sidebar's **Home** button returns to the start. No internet connection or AI service is needed for any calculation.
+The browser opens at <http://localhost:8501> on a **home screen**: upload a CSV/XLSX, enter data manually, or open an example project in one click. Uploads go through a **smart reader** (rule-based, offline) that finds the header row, reads a status date written above the table, matches columns by meaning, detects the data type, removes total rows and converts fractions/lakh/crore — every change is listed on screen, and anything missing (e.g. actual cost) can be typed in the app. The full analysis (Overview, Trends, Forecasts, Commentary, Data) opens once a project is loaded; the sidebar's **Home** button returns to the start. No internet connection or AI service is needed for any calculation.
 
 ## Run the checks
 

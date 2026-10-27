@@ -124,3 +124,15 @@ One panel shows the S-curve beside the combined CPI and SPI trend, then, for wor
 - **Top problem activities**: the five work packages with the largest shortfall, ranked by the more negative of CV and SV, with the main issue (over budget or behind schedule).
 
 For project-level data the panel shows the two charts and explains that the tables need work-package data.
+
+### Uploading your own file: the smart reader
+
+Upload the file as it is; it does not need to match the template. The smart reader (rule-based, works offline, no AI service) then shows **what it understood** before anything is calculated:
+
+- **Data type** detected from your columns (you can change it).
+- **Header row** found even when titles or notes sit above the table; a **status date** written above the table (e.g. "Status date: 28-Feb-2025") becomes the reporting date of every row.
+- **Fixed automatically**, each listed so you can check it: total/summary rows removed, percentages stored as fractions (0.75) converted to 75 %, amounts written as "137 lakh" or "4 crore" converted.
+- **Column matches** with a confidence (High / Medium / Low) and the reason. A column is matched only when both its header and its values fit; unknown columns are listed as not used and are never guessed. A bare "% Complete" (MS Project, duration-based) is not used as physical progress.
+- **Missing data**: if a required column is absent (often actual cost), type the values in the table shown, or download your file with the column added, fill it in Excel and upload it again.
+
+Then check the project settings and the validation result, and open the dashboard. Validation messages give the row number of your original spreadsheet.
