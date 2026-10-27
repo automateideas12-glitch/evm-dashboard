@@ -57,6 +57,7 @@ class Understanding:
     hints: List[str] = field(default_factory=list)
     missing: List[str] = field(default_factory=list)
     unused_columns: List[str] = field(default_factory=list)
+    checks: List[Tuple[str, str]] = field(default_factory=list)   # ("success"|"warning", message)
 
 
 # ================================================================ header vocabulary
@@ -351,6 +352,65 @@ def _missing(mode: str, mapping: Dict[str, Optional[str]], table: pd.DataFrame) 
     return out
 
 
+# ================================================================ cross-check of supplied PV / EV
+def _cross_check(table: pd.DataFrame, mapping: Dict[str, Optional[str]], mode: str, unused: List[str],
+                 hints: List[str]) -> Tuple[List[Tuple[str, str]], List[str]]:
+    """
+    Outside pre-calculated mode the dashboard derives PV = budget x planned % and EV = budget x actual %.
+    If the file also has PV / EV columns, compare them row by row instead of ignoring them.
+    Returns (checks, columns that matched). Columns that differ are reported, and stay a validation warning.
+    """
+    if mode == "precalc":
+        return [], []
+    budget_col = mapping.get("activity_budget") if mode == "work_package" else mapping.get("bac")
+    if mode == "work_package":
+        key_col, unit = mapping.get("activity_id"), "activities"
+    else:
+        key_col, unit = mapping.get("reporting_date"), "reporting dates"
+    checks, matched, ok_labels = [], [], []
+    for fld, pct_field, label, word in (("pv_cumulative", "planned_progress_pct", "PV", "planned"),
+                                        ("ev_cumulative", "actual_progress_pct", "EV", "actual")):
+        col = next((c for c in unused if header_score(c, fld)[0] >= MIN_SCORE), None)
+        if col is None:
+            continue
+        pct_col = mapping.get(pct_field)
+        if not budget_col or not pct_col:
+            hints.append(f"Your '{col}' column is not used: the dashboard calculates {label} itself from the budget "
+                         f"and {word} progress %.")
+            continue
+        diffs, compared = [], 0
+        for i in range(len(table)):
+            supplied = _amount(table[col].iloc[i])[0]
+            budget = _amount(table[budget_col].iloc[i])[0]
+            pct = _amount(table[pct_col].iloc[i])[0]
+            if supplied is None or budget is None or pct is None:
+                continue
+            compared += 1
+            calc = budget * pct / 100.0
+            if abs(supplied - calc) > max(0.5, 1e-6 * abs(calc)):
+                key = table[key_col].iloc[i] if key_col else f"row {i + 1}"
+                if isinstance(key, pd.Timestamp):
+                    key = f"{key:%d %b %Y}"
+                diffs.append(f"{key} (file {supplied:,.0f}; calculated {calc:,.0f})")
+        if not compared:
+            continue
+        if diffs:
+            more = f" and {len(diffs) - 5} more" if len(diffs) > 5 else ""
+            checks.append(("warning", f"Your {label} column '{col}' differs from budget × {word} % for "
+                                      f"{len(diffs)} of {compared} {unit}: {'; '.join(diffs[:5])}{more}. The "
+                                      f"dashboard uses budget × {word} %; check the {word} % or the {label} formula "
+                                      "in your file."))
+        else:
+            matched.append(col)
+            ok_labels.append(label)
+    if ok_labels:
+        cols = " and ".join(ok_labels)
+        checks.insert(0, ("success", f"Your {cols} column{'s' if len(ok_labels) > 1 else ''} match"
+                                     f"{'' if len(ok_labels) > 1 else 'es'} the dashboard's own calculation "
+                                     f"(budget × progress %) for all {len(table)} {unit}."))
+    return checks, matched
+
+
 # ================================================================ main entry
 def understand(file_bytes: bytes, filename: str, mode: Optional[str] = None,
                sheet: Optional[str] = None) -> Understanding:
@@ -457,17 +517,15 @@ def understand(file_bytes: bytes, filename: str, mode: Optional[str] = None,
         if _has(s, r"^(pct|percent) complete$|^pct$|^progress$"):
             hints.append(f"'{c}' was not used as physical progress: a bare '% Complete' (e.g. from MS Project) is "
                          "usually duration-based. Map it by hand only if it really measures physical work.")
-        elif use_mode != "precalc" and (header_score(c, "pv_cumulative")[0] >= MIN_SCORE
-                                         or header_score(c, "ev_cumulative")[0] >= MIN_SCORE):
-            hints.append(f"'{c}' looks like PV/EV. It is not needed here: the dashboard calculates it from "
-                         "progress % and budget (you can use it to cross-check).")
+    checks, crosschecked = _cross_check(table, mapping, use_mode, unused, hints)
+    table.attrs["crosschecked_columns"] = crosschecked
     if meta.get("project_name"):
         pass
     table.attrs["row_numbers"] = row_numbers
     table.attrs["blank_rows_skipped"] = blank
     u = Understanding(table=table, mode=use_mode, mode_reason=reason, mapping=mapping, matches=matches,
                       header_row=h_i + 1, row_numbers=row_numbers, sheet=grid.name, metadata=meta, fixes=fixes,
-                      hints=hints, unused_columns=unused)
+                      hints=hints, unused_columns=unused, checks=checks)
     u.missing = _missing(use_mode, mapping, table)
     return u
 

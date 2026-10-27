@@ -133,6 +133,7 @@ Upload the file as it is; it does not need to match the template. The smart read
 - **Header row** found even when titles or notes sit above the table; a **status date** written above the table (e.g. "Status date: 28-Feb-2025") becomes the reporting date of every row.
 - **Fixed automatically**, each listed so you can check it: total/summary rows removed, percentages stored as fractions (0.75) converted to 75 %, amounts written as "137 lakh" or "4 crore" converted.
 - **Column matches** with a confidence (High / Medium / Low) and the reason. A column is matched only when both its header and its values fit; unknown columns are listed as not used and are never guessed. A bare "% Complete" (MS Project, duration-based) is not used as physical progress.
+- **Your own PV / EV columns**: in progress and work-package data the dashboard calculates PV = budget × planned % and EV = budget × actual %. If your file also has PV or EV columns, they are compared row by row: a green message confirms they match; otherwise each differing activity is listed with both values.
 - **Missing data**: if a required column is absent (often actual cost), type the values in the table shown, or download your file with the column added, fill it in Excel and upload it again.
 
 Then check the project settings and the validation result, and open the dashboard. Validation messages give the row number of your original spreadsheet.

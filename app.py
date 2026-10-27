@@ -260,15 +260,21 @@ def smart_upload(up, replace_name):
         if u.fixes:
             st.markdown("**Fixed automatically** (shown so you can check them):\n" +
                         "\n".join(f"- ✅ {x}" for x in u.fixes))
+        for level, msg in u.checks:
+            (st.success if level == "success" else st.warning)(msg, icon="✅" if level == "success" else "⚠️")
         for h in u.hints:
             st.info(h)
         mt = pd.DataFrame([{"Dashboard field": FIELDS[m["field"]][0], "Your column": m["column"],
                             "Confidence": CONF_ICON[m["confidence"]], "Why": m["reason"]} for m in u.matches])
         if len(mt):
             st.dataframe(mt, hide_index=True, width="stretch")
-        if u.unused_columns:
+        checked = u.table.attrs.get("crosschecked_columns", [])
+        other = [c for c in u.unused_columns if c not in checked]
+        if checked:
+            st.caption("Used only to cross-check: " + ", ".join(f"'{c}'" for c in checked))
+        if other:
             st.caption("Not used (not needed or not recognised — never guessed): " +
-                       ", ".join(f"'{c}'" for c in u.unused_columns))
+                       ", ".join(f"'{c}'" for c in other))
 
     # ---- anything still missing: let the user supply it here or in the file
     if u.missing:

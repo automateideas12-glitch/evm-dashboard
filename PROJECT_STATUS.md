@@ -12,7 +12,7 @@ Working tool + source · user manual (3–5 pp) · validation report with manual
 
 | Area | Status | Evidence |
 |---|---|---|
-| Calculation engine (all Topic 7 metrics, 4 EAC methods, both TCPIs) | Tested and passed | `reports/test_results.txt` (139 passed) |
+| Calculation engine (all Topic 7 metrics, 4 EAC methods, both TCPIs) | Tested and passed | `reports/test_results.txt` (145 passed) |
 | Benchmark, two periods | 162/162 comparisons pass (3 input modes) | `reports/benchmark_comparison.md` |
 | Input: CSV/XLSX upload, mapping, validation, manual entry, 3 modes | Tested and passed (manual cell edit: see open item 3) | tests + `reports/browser_test_log.txt` |
 | Home screen (upload / manual / one-click examples) then dashboard: 5 tabs, combined CPI–SPI chart, work-package status and top problem activities, commentary, exports | Tested (AppTest + browser) | `tests/test_app.py`, screenshots |
@@ -23,11 +23,12 @@ Working tool + source · user manual (3–5 pp) · validation report with manual
 | Presentation | Outline + viva bank; slides not built | `reports/presentation_outline.md`, `reports/viva_question_bank.md` |
 
 ## Tests executed (21-Oct-2026)
-- `python -m pytest`: 139 passed on 27-Oct-2026 (smart reader added; 107 before it) (Python 3.13; Streamlit 1.66, pandas 3.0.5). Earlier: 79 passed on Streamlit 1.50 / pandas 2.2.3 / Plotly 5.24.
+- `python -m pytest`: 145 passed on 27-Oct-2026 (smart reader + PV/EV cross-check) (Python 3.13; Streamlit 1.66, pandas 3.0.5). Earlier: 79 passed on Streamlit 1.50 / pandas 2.2.3 / Plotly 5.24.
 - Mutation testing: 7/7 injected formula errors detected.
 - Browser (Chromium/Playwright, `tests/browser_test_playwright.py`): all tabs render; invalid upload blocked with row-level errors and project unchanged; valid CSV upload loads; manual entry reproduces benchmark P2 (CPI 0.917, SPI 0.846, EAC(A) ₹436.36 lakh, TCPI 1.077).
 
 ## Change log
+- 27-Oct-2026: supplied PV/EV columns are cross-checked row by row against budget × progress % instead of being flagged as unused (tested on Prashant's synthetic site sheet; 3/3 injected faults detected).
 - 27-Oct-2026: smart reader for uploads (`src/smart_reader.py`, `tests/test_smart_reader.py`, `tests/browser_smart_reader.py`): finds header row, status date above table, matches columns by header + values with confidence, detects data type, removes total rows, converts fractions and lakh/crore, lets users supply missing actual cost; validation rows refer to the original spreadsheet. Tested on the team's own site sheet; 10/10 injected faults detected; browser test 13/13 checks pass (`reports/browser_smart_reader_log.txt`).
 - 27-Oct-2026: home screen before analysis; combined CPI and SPI chart (Overview + Trends); work-package status and top problem activities panel (`src/analysis.py`, `tests/test_analysis.py`). 7/7 injected faults in the new code detected by tests.
 

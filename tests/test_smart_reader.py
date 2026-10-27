@@ -286,3 +286,65 @@ Reporting date,Actual progress comments,Physical progress %,Planned progress (%)
 """), "comments.csv")
     assert u.mapping["actual_progress_pct"] == "Physical progress %"   # text column rejected by its values
     assert u.mapping["notes"] == "Actual progress comments"
+
+
+# ================================================================ supplied PV / EV columns (Prashant's sheet)
+FULL = ROOT / "tests" / "fixtures" / "site_sheet_with_pv_ev_ac.xlsx"   # same sheet + PV, EV, AC columns
+
+
+@pytest.fixture(scope="module")
+def full():
+    return understand(FULL.read_bytes(), FULL.name)
+
+
+def test_sheet_with_actual_cost_needs_nothing_more(full):
+    assert full.mapping["ac_cumulative"] == "AC"
+    assert full.missing == []
+
+
+def test_supplied_pv_and_ev_are_cross_checked_not_flagged(full):
+    assert not any("looks like" in h for h in full.hints)
+    assert len(full.checks) == 1
+    level, msg = full.checks[0]
+    assert level == "success"
+    assert "PV" in msg and "EV" in msg and "all 12" in msg
+
+
+def test_cross_checked_columns_raise_no_validation_warning(full):
+    p = prepare(full.table, full.mapping, ProjectSettings(name="Prashant"), full.mode)
+    assert p.ok
+    assert p.report.warnings == []                 # nothing to worry about -> no "1 data warning" banner
+
+
+def test_results_equal_the_sheets_own_totals(full):
+    p = prepare(full.table, full.mapping, ProjectSettings(name="Prashant"), full.mode)
+    r = compute_results(p.periods, p.bac).iloc[-1]
+    assert p.bac == pytest.approx(3_240_000)
+    assert r["pv"] == pytest.approx(2_111_538.4615, abs=0.01)
+    assert r["ev"] == pytest.approx(1_063_500)
+    assert r["ac"] == pytest.approx(1_155_000)
+    assert r["cpi"] == pytest.approx(1_063_500 / 1_155_000)
+
+
+def test_supplied_ev_that_disagrees_is_reported_by_activity():
+    u = understand(csv("""
+Status date,Activity ID,Activity,Budget,Planned %,Actual %,PV,EV,AC
+2026-02-28,A1,Excavation,250000,100,100,250000,250000,262000
+2026-02-28,A2,Footings,350000,100,75,350000,280000,300000
+"""), "mismatch.csv")
+    levels = [lvl for lvl, _ in u.checks]
+    assert "warning" in levels
+    msg = next(m for lvl, m in u.checks if lvl == "warning")
+    assert "A2" in msg and "280,000" in msg and "262,500" in msg     # file says 280,000; 75 % x 350,000
+    assert "A1" not in msg
+    p = prepare(u.table, u.mapping, ProjectSettings(name="x"), u.mode)
+    assert any("EV" in w.message for w in p.report.warnings)          # a real difference stays a warning
+
+
+def test_progress_file_with_pv_column_is_cross_checked_against_bac():
+    u = understand(csv("""
+Reporting date,Planned %,Actual %,PV,AC,BAC
+2026-01-31,36.5,32,14600000,13700000,40000000
+"""), "prog_pv.csv")
+    assert u.mode == "progress"
+    assert u.checks and u.checks[0][0] == "success"

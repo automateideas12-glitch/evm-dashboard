@@ -267,6 +267,8 @@ def prepare(raw: pd.DataFrame, mapping: Dict[str, Optional[str]], settings: Proj
     if unmapped:
         looks = [c for c in unmapped if normalise_header(c) in
                  (["pv", "ev", "planned_value", "earned_value", "bcws", "bcwp", "pv_cumulative", "ev_cumulative"])]
+        checked = set(raw.attrs.get("crosschecked_columns", [])) if hasattr(raw, "attrs") else set()
+        looks = [c for c in looks if c not in checked]     # already compared row by row by the smart reader
         if looks and mode != "precalc":
             rep.warning(f"Column(s) {looks} look like supplied PV/EV but are NOT used in {MODES[mode]} mode; "
                         "PV and EV are derived from progress and budget instead.", field="pv_cumulative",
