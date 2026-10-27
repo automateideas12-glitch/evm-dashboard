@@ -1,4 +1,7 @@
-Loaded app; signboard: 'Critical\nDemo - G+7 commercial building (SYNTHETIC)\nStatus date 30 Sep 2026 \xa0|\xa0 Building — commercial \xa0|\xa0 Forecast method A: BAC/CPI'
+Home screen shown first: True
+Home upload opened dashboard: 'Uploaded on home screen'
+Performance and problem areas panel shown: True
+Loaded demo from home; signboard: 'Critical\nDemo - G+7 commercial building (SYNTHETIC)\nStatus date 30 Sep 2026 \xa0|\xa0 Building — commercial \xa0|\xa0 Forecast method A: BAC/CPI'
 Tab Trends rendered
 Tab Forecasts rendered
 Tab Commentary rendered

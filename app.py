@@ -11,20 +11,22 @@ import io
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 import pandas as pd
 import streamlit as st
 
 from src import __version__
-from src.charts import (AC_C, EV_C, PV_C, budget_vs_forecast_chart, cumulative_chart, eac_trend_chart,
-                        index_chart, progress_chart, wp_variance_chart)
+from src.analysis import NOT_STARTED, problem_activities, work_package_status
+from src.charts import (budget_vs_forecast_chart, combined_index_chart, cumulative_chart, eac_trend_chart,
+                        progress_chart, wp_variance_chart)
 from src.commentary import (CRITICAL, FAVOURABLE, INSUFFICIENT, WARNING, HealthThresholds, classify,
                             generate_commentary)
 from src.data_processing import (FIELDS, MODE_FIELDS, MODES, ProcessedData, ProjectSettings, excel_sheet_names,
                                  mode_fields, prepare, read_table, suggest_mapping, template)
 from src.evm_calculations import compute_results, metric_from_row
 from src.forecasting import METHODS
-from src.formatting import format_metric, format_money
+from src.formatting import format_index, format_metric, format_money
 from src.validation import is_missing
 
 ROOT = Path(__file__).parent
@@ -54,6 +56,9 @@ h1, h2, h3 { letter-spacing: -0.01em; color: #1F2A33; }
   color:#1F2A33; }
 [data-testid="stMetricValue"] { font-size: 1.55rem; font-weight: 600; }
 .section-intro { color:#4A5560; margin-top:-.4rem; margin-bottom:.6rem; max-width: 75ch; }
+.hero { border:2px solid #1F2A33; background:#fff; padding:1.2rem 1.5rem; margin-bottom:1.2rem; }
+.hero-title { font-size:2.2rem; font-weight:700; color:#1F2A33; line-height:1.1; }
+.hero-sub { font-size:1.05rem; color:#4A5560; margin-top:.35rem; max-width:80ch; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -123,8 +128,286 @@ def current_results(cur: dict) -> pd.DataFrame:
     return compute_results(periods, p.bac)
 
 
+# ---------------------------------------------------------------- data entry (home + Data tab)
+def settings_form(prefix: str, base: ProjectSettings, mode: str, bac_in_file=None) -> ProjectSettings:
+    c = st.columns(3)
+    name = c[0].text_input("Project name *", base.name, key=f"{prefix}_name")
+    ptype = c[1].selectbox("Project type", PROJECT_TYPES,
+                           index=PROJECT_TYPES.index(base.project_type) if base.project_type in PROJECT_TYPES else 5,
+                           key=f"{prefix}_type")
+    cur_opts = ["INR", "USD", "EUR", "GBP"]
+    currency = c[2].selectbox("Currency", cur_opts, index=cur_opts.index(base.currency) if base.currency in cur_opts else 0,
+                              key=f"{prefix}_cur")
+    c = st.columns(3)
+    if mode == "work_package":
+        bac = c[0].number_input("Project BAC (optional — checked against WP budgets)", min_value=0.0, value=None,
+                                step=100000.0, key=f"{prefix}_bac")
+    elif bac_in_file is not None:
+        c[0].text_input("BAC (from file)", f"{bac_in_file:,.2f}", disabled=True, key=f"{prefix}_bacf")
+        bac = None
+    else:
+        bac = c[0].number_input("BAC * (full amount)", min_value=0.0,
+                                value=float(base.bac) if base.bac else None, step=100000.0, key=f"{prefix}_bac")
+    bs = c[1].date_input("Baseline start", value=base.baseline_start, key=f"{prefix}_bs")
+    bf = c[2].date_input("Baseline completion", value=base.baseline_finish, key=f"{prefix}_bf")
+    c = st.columns(3)
+    freq = c[0].selectbox("Reporting frequency", ["Monthly", "Weekly", "Irregular"],
+                          index=["Monthly", "Weekly", "Irregular"].index(base.reporting_frequency), key=f"{prefix}_fq",
+                          help="Used to detect missing reporting periods.")
+    pm = c[1].text_input("Project manager (optional)", base.project_manager, key=f"{prefix}_pm")
+    dayfirst = c[2].radio("Non-ISO dates are written as", ["DD/MM/YYYY", "MM/DD/YYYY"],
+                          index=0 if base.dayfirst else 1, horizontal=True, key=f"{prefix}_df",
+                          help="YYYY-MM-DD dates are always read unambiguously.") == "DD/MM/YYYY"
+    return ProjectSettings(name=name.strip(), project_type=ptype, currency=currency,
+                           bac=float(bac) if bac else None, baseline_start=bs or None, baseline_finish=bf or None,
+                           project_manager=pm, reporting_frequency=freq, dayfirst=dayfirst)
+
+
+def show_validation(p: ProcessedData):
+    rep = p.report
+    bad_rows = len(rep.rows_with_errors())
+    c = st.columns(4)
+    c[0].metric("Records read", rep.records_read)
+    c[1].metric("Records without errors", max(rep.records_read - bad_rows, 0))
+    c[2].metric("Blocking errors", len(rep.errors))
+    c[3].metric("Warnings", len(rep.warnings))
+    if rep.issues:
+        st.dataframe(rep.to_frame(), hide_index=True, width="stretch")
+    if p.ok:
+        st.success("Validation passed. Review any warnings, then load the data.")
+        show = p.periods[["reporting_date", "planned_pct", "actual_pct", "pv", "ev", "ac"]].copy()
+        show["reporting_date"] = show["reporting_date"].dt.strftime("%Y-%m-%d")
+        show.columns = ["Reporting date", "Planned %", "Actual %", "PV", "EV", "AC"]
+        st.caption("Processed reporting periods (sources: " +
+                   "; ".join(f"{k}: {v}" for k, v in p.value_sources.items()) + ")")
+        st.dataframe(show, hide_index=True, width="stretch")
+    else:
+        st.error("The data has blocking errors and cannot be loaded. Correct them and the check will rerun. "
+                 "The project currently shown in the dashboard has not been changed.")
+
+
+def confirm_and_load(p: ProcessedData, label: str, key: str, replace_name: Optional[str] = None):
+    """On the home screen (nothing loaded) open directly; otherwise ask before replacing the shown project."""
+    ok = replace_name is None or st.checkbox(f"Replace the project currently shown (“{replace_name}”) with this data",
+                                             key=f"{key}_conf")
+    if st.button("Open dashboard" if replace_name is None else "Load into dashboard", type="primary",
+                 disabled=not ok, key=f"{key}_btn"):
+        st.session_state.current = make_current(p, label)
+        st.session_state.flash = f"Loaded “{p.settings.name}” ({MODES[p.mode]}, {len(p.periods)} reporting dates)."
+        st.rerun()
+
+
+def results_export(r: pd.DataFrame) -> pd.DataFrame:
+    keep = [c for c in r.columns if not c.endswith("__note")]
+    return r[keep]
+
+
+def excel_export(cur: dict, r: pd.DataFrame) -> bytes:
+    p = cur["processed"]
+    s = p.settings
+    info = pd.DataFrame({"Item": ["Project name", "Project type", "Currency", "BAC", "Baseline start",
+                                  "Baseline completion", "Input mode", "Value sources", "Independent ETC entries",
+                                  "Exported"],
+                         "Value": [s.name, s.project_type, s.currency, p.bac, s.baseline_start, s.baseline_finish,
+                                   MODES[p.mode], "; ".join(f"{k}: {v}" for k, v in p.value_sources.items()),
+                                   "; ".join(f"{pd.Timestamp(k).date()}: {v:,.2f} (user-entered)"
+                                             for k, v in cur["etc_overrides"].items()) or "none",
+                                   datetime.now().strftime("%Y-%m-%d %H:%M")]})
+    bio = io.BytesIO()
+    with pd.ExcelWriter(bio, engine="openpyxl") as xw:
+        info.to_excel(xw, sheet_name="Project", index=False)
+        p.inputs.to_excel(xw, sheet_name="Validated inputs", index=False)
+        p.periods.to_excel(xw, sheet_name="Reporting periods", index=False)
+        r.to_excel(xw, sheet_name="EVM results", index=False)
+        if p.wp_detail is not None:
+            p.wp_detail.to_excel(xw, sheet_name="Work packages", index=False)
+        p.report.to_frame().to_excel(xw, sheet_name="Validation", index=False)
+    return bio.getvalue()
+
+
+def data_loader(on_home: bool):
+    """Upload / manual entry / built-in example. Used on the home screen and in the Data tab."""
+    cur_ = st.session_state.get("current")
+    cur_proc: Optional[ProcessedData] = None if on_home or cur_ is None else cur_["processed"]
+    replace_name = None if cur_proc is None else cur_proc.settings.name
+    st.subheader("Start a project" if on_home else "Load or enter project data")
+    mode = st.radio("1. What kind of data do you have?", list(MODES), format_func=lambda m: MODES[m],
+                    horizontal=True, key="data_mode")
+    st.caption({
+        "progress": "You supply BAC, cumulative planned %, cumulative actual PHYSICAL % and actual cost. The tool "
+                    "derives PV = planned % × BAC and EV = actual % × BAC.",
+        "precalc": "You supply cumulative PV, EV and AC (e.g. exported from project-controls software). They are "
+                   "used exactly as supplied; the tool calculates the remaining metrics.",
+        "work_package": "You supply each work package's budget, cumulative planned and actual % and cumulative AC at "
+                        "every reporting date. The tool sums budget-weighted PV and EV across work packages.",
+    }[mode])
+    tc = st.columns(4)
+    tbuf = io.StringIO()
+    template(mode).to_csv(tbuf, index=False)
+    tc[0].download_button(f"Template — {MODES[mode]} (CSV)", tbuf.getvalue(), f"template_{mode}.csv", "text/csv")
+    sample_file = {"progress": "sample_project_progress.csv", "precalc": "sample_project_evm.csv",
+                   "work_package": "sample_project_work_packages.csv"}[mode]
+    tc[1].download_button("Sample dataset (CSV)", (DATA / sample_file).read_bytes(), sample_file, "text/csv")
+    tc[2].download_button("Sample dataset, all formats (Excel)", (DATA / "sample_project.xlsx").read_bytes(),
+                          "sample_project.xlsx",
+                          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    tc[3].download_button("Benchmark case (CSV)", (DATA / "benchmark_case_work_packages.csv").read_bytes(),
+                          "benchmark_case_work_packages.csv", "text/csv")
+
+    how = st.radio("2. How do you want to provide it?", ["Upload a file", "Enter or edit manually",
+                                                          "Load a built-in example"], horizontal=True, key="how")
+
+    if how == "Upload a file":
+        up = st.file_uploader("Upload a CSV or Excel (.xlsx) file", type=["csv", "xlsx"], key="uploader")
+        if up is not None:
+            data = up.getvalue()
+            sheet = 0
+            try:
+                if up.name.lower().endswith(".xlsx"):
+                    names = excel_sheet_names(data)
+                    sheet = st.selectbox("Worksheet", names, key="sheet")
+                raw = read_table(data, up.name, sheet)
+            except Exception as exc:  # unreadable file: report, never crash or replace the project
+                st.error(f"The file could not be read: {exc}. Check that it is a valid CSV/XLSX with one header row.")
+                raw = None
+            if raw is not None:
+                st.markdown(f"**Preview** — {len(raw)} records, {len(raw.columns)} columns")
+                st.dataframe(raw.head(50), hide_index=True, width="stretch")
+                st.markdown("**3. Check the column mapping**")
+                st.caption("Suggested from the column names. Fields marked * are required. Columns you do not map "
+                           "are ignored, never guessed. MS Project's '% Complete' is duration-based — map it to "
+                           "actual physical progress only if it truly measures physical work.")
+                sugg = suggest_mapping(list(raw.columns), mode)
+                opts = ["— not mapped —"] + list(raw.columns)
+                spec = MODE_FIELDS[mode]
+                mapping = {}
+                grid = st.columns(3)
+                for i, f in enumerate(mode_fields(mode)):
+                    req = f in spec["required"] or (spec["ac_choice"] and f in ("ac_cumulative",))
+                    lab = FIELDS[f][0] + (" *" if f in spec["required"] else "")
+                    if spec["ac_choice"] and f in ("ac_cumulative", "ac_period"):
+                        lab += " (one of the two AC fields required)"
+                    choice = grid[i % 3].selectbox(lab, opts, index=opts.index(sugg[f]) if sugg.get(f) else 0,
+                                                   key=f"map_{mode}_{f}_{up.name}", help=FIELDS[f][1])
+                    mapping[f] = None if choice == opts[0] else choice
+                st.markdown("**4. Project settings**")
+                bac_file = None
+                if mapping.get("bac"):
+                    vals = {to for to in pd.to_numeric(raw[mapping["bac"]].astype(str).str.replace(",", ""),
+                                                       errors="coerce").dropna()}
+                    bac_file = sorted(vals)[0] if len(vals) == 1 else None
+                base = ProjectSettings()
+                if mapping.get("project_name"):
+                    nm = [v for v in raw[mapping["project_name"]] if not is_missing(v)]
+                    base.name = str(nm[0]).strip() if nm else ""
+                settings = settings_form(f"up_{mode}_{up.name}_{len(data)}", base, mode, bac_file)
+                st.markdown("**5. Validation result**")
+                p = prepare(raw, mapping, settings, mode)
+                show_validation(p)
+                if p.ok:
+                    confirm_and_load(p, f"Uploaded file: {up.name}", "up", replace_name)
+
+    elif how == "Enter or edit manually":
+        same = cur_proc is not None and cur_proc.mode == mode
+        st.caption("Edit cells directly; use the + row control to add reporting periods. Values are checked with "
+                   "the same rules as uploaded files before anything is applied.")
+        bkey = f"manual_base_{mode}"
+        if bkey not in st.session_state:
+            if same:
+                cols = [c_ for c_ in mode_fields(mode) if c_ in cur_proc.inputs.columns and c_ not in
+                        ("project_name", "currency", "bac")]
+                st.session_state[bkey] = cur_proc.inputs[cols].copy()
+            else:
+                st.session_state[bkey] = template(mode)
+        cc = st.columns([2, 2, 3])
+        if cc[0].button("Reload from current project", disabled=not same):
+            st.session_state.pop(bkey, None)
+            st.session_state.pop(f"editor_{mode}", None)
+            st.rerun()
+        wipe = cc[2].checkbox("I want to discard the table and start blank", key=f"wipe_{mode}")
+        if cc[1].button("Start a new blank table", disabled=not wipe):
+            st.session_state[bkey] = template(mode).iloc[0:0]
+            st.session_state.pop(f"editor_{mode}", None)
+            st.rerun()
+        base_df = st.session_state[bkey].copy()
+        fields = [f for f in mode_fields(mode) if f not in ("project_name", "currency", "bac")]
+        for f in fields:
+            if f not in base_df.columns:
+                base_df[f] = None
+        base_df = base_df[fields]
+        base_df["reporting_date"] = pd.to_datetime(base_df["reporting_date"], errors="coerce")
+        for f in fields:
+            if FIELDS[f][2] in ("money", "pct"):
+                base_df[f] = pd.to_numeric(base_df[f], errors="coerce")
+            elif FIELDS[f][2] == "text":
+                base_df[f] = base_df[f].astype("object").where(base_df[f].notna(), None)
+        cfg = {}
+        for f in fields:
+            lab, desc, kind = FIELDS[f]
+            req = f in MODE_FIELDS[mode]["required"]
+            lab = lab + (" *" if req else "")
+            if kind == "date":
+                cfg[f] = st.column_config.DateColumn(lab, help=desc, format="YYYY-MM-DD")
+            elif kind == "pct":
+                cfg[f] = st.column_config.NumberColumn(lab, help=desc + " (0–100)", format="%.2f")
+            elif kind == "money":
+                cfg[f] = st.column_config.NumberColumn(lab, help=desc, format="%.2f")
+            else:
+                cfg[f] = st.column_config.TextColumn(lab, help=desc)
+        edited = st.data_editor(base_df, num_rows="dynamic", column_config=cfg, key=f"editor_{mode}",
+                                width="stretch", hide_index=True)
+        st.markdown("**Project settings**")
+        settings = settings_form(f"man_{mode}", cur_proc.settings if same else ProjectSettings(), mode)
+        st.markdown("**Validation result**")
+        p = prepare(edited, {c_: c_ for c_ in edited.columns}, settings, mode, first_data_row=1)
+        st.caption("Row numbers in messages count from 1 = first table row.")
+        show_validation(p)
+        if p.ok:
+            confirm_and_load(p, "Manually entered data", "man", replace_name)
+
+    else:
+        st.caption("The demo and benchmark use SYNTHETIC data. The real project is an actual Belgian apartment "
+                   "building from the DSLIB empirical project database (Ghent University): 25 activities, "
+                   "13 tracking periods, values in EUR. Source: Batselier & Vanhoucke (2015), International "
+                   "Journal of Project Management 33(3), 697–710.")
+        ex = st.radio("Example", ["Demo project — G+7 commercial building, 6 work packages, 9 months",
+                                  "Benchmark case — G+4 residential block, 4 work packages, 2 months "
+                                  "(used for manual validation)",
+                                  "Real project — apartment building, Belgium 2011–12 (DSLIB C2014-05)"],
+                      key="example")
+        ok = on_home or st.checkbox(f"Replace the project currently shown (“{replace_name}”)", key="ex_conf")
+        if st.button("Open example" if on_home else "Load example", type="primary", disabled=not ok):
+            st.session_state.current = (demo_project() if ex.startswith("Demo") else
+                                        real_project() if ex.startswith("Real") else benchmark_project())
+            st.session_state.flash = "Example loaded."
+            st.rerun()
+
+
+
+def home_screen():
+    with st.sidebar:
+        st.markdown("### EVM Dashboard")
+        st.caption(f"CE 725 course project · v{__version__}")
+        st.caption("Start a project on the home screen. The analysis opens once data is loaded.")
+    st.markdown('<div class="hero"><div class="hero-title">EVM Dashboard</div>'
+                '<div class="hero-sub">Earned Value Management for construction projects: compare planned '
+                'progress, earned value and actual cost, spot problems early and forecast the final cost.</div>'
+                '</div>', unsafe_allow_html=True)
+    data_loader(on_home=True)
+    st.divider()
+    st.markdown("**Or open an example project in one click**")
+    q = st.columns(3)
+    for col, key, lab, fn in ((q[0], "home_demo", "Demo project (synthetic, 6 work packages)", demo_project),
+                              (q[1], "home_real", "Real project (DSLIB C2014-05, Belgium)", real_project),
+                              (q[2], "home_bench", "Benchmark case (manual validation)", benchmark_project)):
+        if col.button(lab, key=key, width="stretch"):
+            st.session_state.current = fn()
+            st.rerun()
+
+# ---------------------------------------------------------------- main flow
 if "current" not in st.session_state:
-    st.session_state.current = demo_project()
+    home_screen()
+    st.stop()
 
 cur = st.session_state.current
 proc: ProcessedData = cur["processed"]
@@ -135,6 +418,9 @@ res = current_results(cur)
 with st.sidebar:
     st.markdown("### EVM Dashboard")
     st.caption(f"CE 725 course project · v{__version__}")
+    if st.button("← Home: start another project", key="go_home", width="stretch"):
+        del st.session_state["current"]
+        st.rerun()
     method = st.selectbox("Forecasting method (EAC)", list(METHODS), index=0,
                           format_func=lambda k: f"{k[0]} — {METHODS[k]['short']}",
                           help="Each method makes a different assumption about future performance. "
@@ -185,7 +471,7 @@ if cur["label"].startswith("REAL"):
                 'in ProTrack for every tracking period.</div>', unsafe_allow_html=True)
 elif "synthetic" in cur["label"].lower():
     st.markdown('<div class="demo-note">You are viewing an illustrative project built from synthetic data. '
-                'Load your own data in the <b>Data</b> tab.</div>', unsafe_allow_html=True)
+                'Load your own data from <b>Home</b> (sidebar) or the <b>Data</b> tab.</div>', unsafe_allow_html=True)
 
 t_over, t_trend, t_fc, t_comm, t_data = st.tabs(["Overview", "Trends", "Forecasts", "Commentary", "Data"])
 
@@ -195,6 +481,67 @@ def kpi(col, label, name, kind, key=None, delta=None, delta_color="normal"):
     col.metric(label, format_metric(m, kind, S.currency, unit), delta=delta, delta_color=delta_color,
                help=KPI_HELP.get(key or name, "") + (f"\n\nNote: {m.note}" if m.note else ""), border=True)
 
+
+
+STATUS_STYLE = {FAVOURABLE: "background-color:#E3F1E8;color:#1E5C38", WARNING: "background-color:#FFF4D6;color:#6B4A00",
+                CRITICAL: "background-color:#FBE4E2;color:#8A1C16", NOT_STARTED: "color:#6B7280",
+                INSUFFICIENT: "color:#6B7280"}
+
+
+def _style_status(v):
+    return STATUS_STYLE.get(v, "")
+
+
+def _style_negative(v):
+    return "color:#8A1C16" if isinstance(v, str) and v.startswith("-") else ""
+
+
+def _style_low_index(v):
+    try:
+        return "color:#8A1C16;font-weight:600" if float(v) < th.index_critical_below else ""
+    except ValueError:
+        return ""
+
+
+def performance_panel():
+    """S-curve + combined CPI/SPI trend, then work-package status + top problem activities."""
+    with st.container(border=True):
+        st.subheader("Performance and problem areas")
+        freq_ = S.reporting_frequency
+        a, b = st.columns([1.35, 1])
+        a.plotly_chart(cumulative_chart(res, proc.bac, method, S.currency, unit, freq_, sel_date, S.baseline_finish),
+                       width="stretch", key="ov_cum")
+        b.plotly_chart(combined_index_chart(res, freq_, th.index_warning_below, th.index_critical_below),
+                       width="stretch", key="ov_idx")
+        if proc.wp_detail is None:
+            st.info("Work-package status and top problem activities need work-package data (input type "
+                    f"'{MODES['work_package']}'). This project was loaded as project-level data.")
+            return
+        a, b = st.columns([1, 1.15])
+        wps = work_package_status(proc.wp_detail, sel_date, th)
+        label = (wps["activity_id"] + " " + wps["activity_name"]).str.strip()
+        idx = lambda v, s_: "–" if s_ == NOT_STARTED else format_index(v)  # noqa: E731
+        view = pd.DataFrame({"Work package": label,
+                             "CPI": [idx(v, s_) for v, s_ in zip(wps["cpi"], wps["status"])],
+                             "SPI": [idx(v, s_) for v, s_ in zip(wps["spi"], wps["status"])],
+                             "Status": wps["status"]})
+        with a:
+            st.markdown("**Work package status**")
+            st.dataframe(view.style.map(_style_status, subset=["Status"])
+                         .map(_style_low_index, subset=["CPI", "SPI"]), hide_index=True, width="stretch")
+        top = problem_activities(proc.wp_detail, sel_date, n=5)
+        with b:
+            st.markdown("**Top problem activities**")
+            if top.empty:
+                st.success("No work package is over budget or behind schedule at this date.")
+            else:
+                tv = pd.DataFrame({"Activity": (top["activity_id"] + " " + top["activity_name"]).str.strip(),
+                                   "Main issue": top["main_issue"],
+                                   "CV": [money(v) for v in top["cv"]], "SV": [money(v) for v in top["sv"]]})
+                st.dataframe(tv.style.map(_style_negative, subset=["CV", "SV"]), hide_index=True, width="stretch")
+        st.caption(f"Status per work package uses the sidebar thresholds (Warning below "
+                   f"{th.index_warning_below:.2f}, Critical below {th.index_critical_below:.2f}, worst of CPI and "
+                   "SPI). Problems are ranked by the more negative of CV and SV.")
 
 # ================================================================ OVERVIEW
 with t_over:
@@ -228,6 +575,8 @@ with t_over:
     kpi(c[2], "Forecast overrun", f"overrun_{method}", "money", "overrun")
     kpi(c[3], "TCPI to reach this EAC", f"tcpi_eac_{method}", "index", "tcpi_eac")
 
+    performance_panel()
+
     st.markdown("#### Health screening")
     hdf = pd.DataFrame(health["components"])
     st.dataframe(hdf, hide_index=True, width="stretch")
@@ -250,14 +599,11 @@ with t_over:
 with t_trend:
     freq = S.reporting_frequency
     st.plotly_chart(cumulative_chart(res, proc.bac, method, S.currency, unit, freq, sel_date, S.baseline_finish),
-                    width="stretch")
+                    width="stretch", key="tr_cum")
     st.caption("Solid lines: observed values. Dashed line: forecast EAC under the selected method. "
                "Missing reporting periods appear as breaks, not as connected lines.")
-    a, b = st.columns(2)
-    a.plotly_chart(index_chart(res, "cpi", "CPI", AC_C, freq, th.index_warning_below, th.index_critical_below),
-                   width="stretch")
-    b.plotly_chart(index_chart(res, "spi", "SPI", PV_C, freq, th.index_warning_below, th.index_critical_below),
-                   width="stretch")
+    st.plotly_chart(combined_index_chart(res, freq, th.index_warning_below, th.index_critical_below),
+                    width="stretch", key="tr_idx")
     a, b = st.columns(2)
     a.plotly_chart(progress_chart(proc.periods, freq), width="stretch")
     b.plotly_chart(budget_vs_forecast_chart(row, proc.bac, S.currency, unit), width="stretch")
@@ -345,99 +691,6 @@ with t_comm:
 
 
 # ================================================================ DATA
-def settings_form(prefix: str, base: ProjectSettings, mode: str, bac_in_file=None) -> ProjectSettings:
-    c = st.columns(3)
-    name = c[0].text_input("Project name *", base.name, key=f"{prefix}_name")
-    ptype = c[1].selectbox("Project type", PROJECT_TYPES,
-                           index=PROJECT_TYPES.index(base.project_type) if base.project_type in PROJECT_TYPES else 5,
-                           key=f"{prefix}_type")
-    cur_opts = ["INR", "USD", "EUR", "GBP"]
-    currency = c[2].selectbox("Currency", cur_opts, index=cur_opts.index(base.currency) if base.currency in cur_opts else 0,
-                              key=f"{prefix}_cur")
-    c = st.columns(3)
-    if mode == "work_package":
-        bac = c[0].number_input("Project BAC (optional — checked against WP budgets)", min_value=0.0, value=None,
-                                step=100000.0, key=f"{prefix}_bac")
-    elif bac_in_file is not None:
-        c[0].text_input("BAC (from file)", f"{bac_in_file:,.2f}", disabled=True, key=f"{prefix}_bacf")
-        bac = None
-    else:
-        bac = c[0].number_input("BAC * (full amount)", min_value=0.0,
-                                value=float(base.bac) if base.bac else None, step=100000.0, key=f"{prefix}_bac")
-    bs = c[1].date_input("Baseline start", value=base.baseline_start, key=f"{prefix}_bs")
-    bf = c[2].date_input("Baseline completion", value=base.baseline_finish, key=f"{prefix}_bf")
-    c = st.columns(3)
-    freq = c[0].selectbox("Reporting frequency", ["Monthly", "Weekly", "Irregular"],
-                          index=["Monthly", "Weekly", "Irregular"].index(base.reporting_frequency), key=f"{prefix}_fq",
-                          help="Used to detect missing reporting periods.")
-    pm = c[1].text_input("Project manager (optional)", base.project_manager, key=f"{prefix}_pm")
-    dayfirst = c[2].radio("Non-ISO dates are written as", ["DD/MM/YYYY", "MM/DD/YYYY"],
-                          index=0 if base.dayfirst else 1, horizontal=True, key=f"{prefix}_df",
-                          help="YYYY-MM-DD dates are always read unambiguously.") == "DD/MM/YYYY"
-    return ProjectSettings(name=name.strip(), project_type=ptype, currency=currency,
-                           bac=float(bac) if bac else None, baseline_start=bs or None, baseline_finish=bf or None,
-                           project_manager=pm, reporting_frequency=freq, dayfirst=dayfirst)
-
-
-def show_validation(p: ProcessedData):
-    rep = p.report
-    bad_rows = len(rep.rows_with_errors())
-    c = st.columns(4)
-    c[0].metric("Records read", rep.records_read)
-    c[1].metric("Records without errors", max(rep.records_read - bad_rows, 0))
-    c[2].metric("Blocking errors", len(rep.errors))
-    c[3].metric("Warnings", len(rep.warnings))
-    if rep.issues:
-        st.dataframe(rep.to_frame(), hide_index=True, width="stretch")
-    if p.ok:
-        st.success("Validation passed. Review any warnings, then load the data.")
-        show = p.periods[["reporting_date", "planned_pct", "actual_pct", "pv", "ev", "ac"]].copy()
-        show["reporting_date"] = show["reporting_date"].dt.strftime("%Y-%m-%d")
-        show.columns = ["Reporting date", "Planned %", "Actual %", "PV", "EV", "AC"]
-        st.caption("Processed reporting periods (sources: " +
-                   "; ".join(f"{k}: {v}" for k, v in p.value_sources.items()) + ")")
-        st.dataframe(show, hide_index=True, width="stretch")
-    else:
-        st.error("The data has blocking errors and cannot be loaded. Correct them and the check will rerun. "
-                 "The project currently shown in the dashboard has not been changed.")
-
-
-def confirm_and_load(p: ProcessedData, label: str, key: str):
-    ok = st.checkbox(f"Replace the project currently shown (“{S.name}”) with this data", key=f"{key}_conf")
-    if st.button("Load into dashboard", type="primary", disabled=not ok, key=f"{key}_btn"):
-        st.session_state.current = make_current(p, label)
-        st.session_state.flash = f"Loaded “{p.settings.name}” ({MODES[p.mode]}, {len(p.periods)} reporting dates)."
-        st.rerun()
-
-
-def results_export(r: pd.DataFrame) -> pd.DataFrame:
-    keep = [c for c in r.columns if not c.endswith("__note")]
-    return r[keep]
-
-
-def excel_export(cur: dict, r: pd.DataFrame) -> bytes:
-    p = cur["processed"]
-    s = p.settings
-    info = pd.DataFrame({"Item": ["Project name", "Project type", "Currency", "BAC", "Baseline start",
-                                  "Baseline completion", "Input mode", "Value sources", "Independent ETC entries",
-                                  "Exported"],
-                         "Value": [s.name, s.project_type, s.currency, p.bac, s.baseline_start, s.baseline_finish,
-                                   MODES[p.mode], "; ".join(f"{k}: {v}" for k, v in p.value_sources.items()),
-                                   "; ".join(f"{pd.Timestamp(k).date()}: {v:,.2f} (user-entered)"
-                                             for k, v in cur["etc_overrides"].items()) or "none",
-                                   datetime.now().strftime("%Y-%m-%d %H:%M")]})
-    bio = io.BytesIO()
-    with pd.ExcelWriter(bio, engine="openpyxl") as xw:
-        info.to_excel(xw, sheet_name="Project", index=False)
-        p.inputs.to_excel(xw, sheet_name="Validated inputs", index=False)
-        p.periods.to_excel(xw, sheet_name="Reporting periods", index=False)
-        r.to_excel(xw, sheet_name="EVM results", index=False)
-        if p.wp_detail is not None:
-            p.wp_detail.to_excel(xw, sheet_name="Work packages", index=False)
-        p.report.to_frame().to_excel(xw, sheet_name="Validation", index=False)
-    return bio.getvalue()
-
-
 with t_data:
     if st.session_state.get("flash"):
         st.success(st.session_state.pop("flash"))
@@ -457,157 +710,7 @@ with t_data:
             st.dataframe(proc.report.to_frame(), hide_index=True, width="stretch")
 
     st.divider()
-    st.subheader("Load or enter project data")
-    mode = st.radio("1. What kind of data do you have?", list(MODES), format_func=lambda m: MODES[m],
-                    horizontal=True, key="data_mode")
-    st.caption({
-        "progress": "You supply BAC, cumulative planned %, cumulative actual PHYSICAL % and actual cost. The tool "
-                    "derives PV = planned % × BAC and EV = actual % × BAC.",
-        "precalc": "You supply cumulative PV, EV and AC (e.g. exported from project-controls software). They are "
-                   "used exactly as supplied; the tool calculates the remaining metrics.",
-        "work_package": "You supply each work package's budget, cumulative planned and actual % and cumulative AC at "
-                        "every reporting date. The tool sums budget-weighted PV and EV across work packages.",
-    }[mode])
-    tc = st.columns(4)
-    tbuf = io.StringIO()
-    template(mode).to_csv(tbuf, index=False)
-    tc[0].download_button(f"Template — {MODES[mode]} (CSV)", tbuf.getvalue(), f"template_{mode}.csv", "text/csv")
-    sample_file = {"progress": "sample_project_progress.csv", "precalc": "sample_project_evm.csv",
-                   "work_package": "sample_project_work_packages.csv"}[mode]
-    tc[1].download_button("Sample dataset (CSV)", (DATA / sample_file).read_bytes(), sample_file, "text/csv")
-    tc[2].download_button("Sample dataset, all formats (Excel)", (DATA / "sample_project.xlsx").read_bytes(),
-                          "sample_project.xlsx",
-                          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    tc[3].download_button("Benchmark case (CSV)", (DATA / "benchmark_case_work_packages.csv").read_bytes(),
-                          "benchmark_case_work_packages.csv", "text/csv")
-
-    how = st.radio("2. How do you want to provide it?", ["Upload a file", "Enter or edit manually",
-                                                          "Load a built-in example"], horizontal=True, key="how")
-
-    if how == "Upload a file":
-        up = st.file_uploader("Upload a CSV or Excel (.xlsx) file", type=["csv", "xlsx"], key="uploader")
-        if up is not None:
-            data = up.getvalue()
-            sheet = 0
-            try:
-                if up.name.lower().endswith(".xlsx"):
-                    names = excel_sheet_names(data)
-                    sheet = st.selectbox("Worksheet", names, key="sheet")
-                raw = read_table(data, up.name, sheet)
-            except Exception as exc:  # unreadable file: report, never crash or replace the project
-                st.error(f"The file could not be read: {exc}. Check that it is a valid CSV/XLSX with one header row.")
-                raw = None
-            if raw is not None:
-                st.markdown(f"**Preview** — {len(raw)} records, {len(raw.columns)} columns")
-                st.dataframe(raw.head(50), hide_index=True, width="stretch")
-                st.markdown("**3. Check the column mapping**")
-                st.caption("Suggested from the column names. Fields marked * are required. Columns you do not map "
-                           "are ignored, never guessed. MS Project's '% Complete' is duration-based — map it to "
-                           "actual physical progress only if it truly measures physical work.")
-                sugg = suggest_mapping(list(raw.columns), mode)
-                opts = ["— not mapped —"] + list(raw.columns)
-                spec = MODE_FIELDS[mode]
-                mapping = {}
-                grid = st.columns(3)
-                for i, f in enumerate(mode_fields(mode)):
-                    req = f in spec["required"] or (spec["ac_choice"] and f in ("ac_cumulative",))
-                    lab = FIELDS[f][0] + (" *" if f in spec["required"] else "")
-                    if spec["ac_choice"] and f in ("ac_cumulative", "ac_period"):
-                        lab += " (one of the two AC fields required)"
-                    choice = grid[i % 3].selectbox(lab, opts, index=opts.index(sugg[f]) if sugg.get(f) else 0,
-                                                   key=f"map_{mode}_{f}_{up.name}", help=FIELDS[f][1])
-                    mapping[f] = None if choice == opts[0] else choice
-                st.markdown("**4. Project settings**")
-                bac_file = None
-                if mapping.get("bac"):
-                    vals = {to for to in pd.to_numeric(raw[mapping["bac"]].astype(str).str.replace(",", ""),
-                                                       errors="coerce").dropna()}
-                    bac_file = sorted(vals)[0] if len(vals) == 1 else None
-                base = ProjectSettings()
-                if mapping.get("project_name"):
-                    nm = [v for v in raw[mapping["project_name"]] if not is_missing(v)]
-                    base.name = str(nm[0]).strip() if nm else ""
-                settings = settings_form(f"up_{mode}_{up.name}_{len(data)}", base, mode, bac_file)
-                st.markdown("**5. Validation result**")
-                p = prepare(raw, mapping, settings, mode)
-                show_validation(p)
-                if p.ok:
-                    confirm_and_load(p, f"Uploaded file: {up.name}", "up")
-
-    elif how == "Enter or edit manually":
-        same = proc.mode == mode
-        st.caption("Edit cells directly; use the + row control to add reporting periods. Values are checked with "
-                   "the same rules as uploaded files before anything is applied.")
-        bkey = f"manual_base_{mode}"
-        if bkey not in st.session_state:
-            if same:
-                cols = [c_ for c_ in mode_fields(mode) if c_ in proc.inputs.columns and c_ not in
-                        ("project_name", "currency", "bac")]
-                st.session_state[bkey] = proc.inputs[cols].copy()
-            else:
-                st.session_state[bkey] = template(mode)
-        cc = st.columns([2, 2, 3])
-        if cc[0].button("Reload from current project", disabled=not same):
-            st.session_state.pop(bkey, None)
-            st.session_state.pop(f"editor_{mode}", None)
-            st.rerun()
-        wipe = cc[2].checkbox("I want to discard the table and start blank", key=f"wipe_{mode}")
-        if cc[1].button("Start a new blank table", disabled=not wipe):
-            st.session_state[bkey] = template(mode).iloc[0:0]
-            st.session_state.pop(f"editor_{mode}", None)
-            st.rerun()
-        base_df = st.session_state[bkey].copy()
-        fields = [f for f in mode_fields(mode) if f not in ("project_name", "currency", "bac")]
-        for f in fields:
-            if f not in base_df.columns:
-                base_df[f] = None
-        base_df = base_df[fields]
-        base_df["reporting_date"] = pd.to_datetime(base_df["reporting_date"], errors="coerce")
-        for f in fields:
-            if FIELDS[f][2] in ("money", "pct"):
-                base_df[f] = pd.to_numeric(base_df[f], errors="coerce")
-            elif FIELDS[f][2] == "text":
-                base_df[f] = base_df[f].astype("object").where(base_df[f].notna(), None)
-        cfg = {}
-        for f in fields:
-            lab, desc, kind = FIELDS[f]
-            req = f in MODE_FIELDS[mode]["required"]
-            lab = lab + (" *" if req else "")
-            if kind == "date":
-                cfg[f] = st.column_config.DateColumn(lab, help=desc, format="YYYY-MM-DD")
-            elif kind == "pct":
-                cfg[f] = st.column_config.NumberColumn(lab, help=desc + " (0–100)", format="%.2f")
-            elif kind == "money":
-                cfg[f] = st.column_config.NumberColumn(lab, help=desc, format="%.2f")
-            else:
-                cfg[f] = st.column_config.TextColumn(lab, help=desc)
-        edited = st.data_editor(base_df, num_rows="dynamic", column_config=cfg, key=f"editor_{mode}",
-                                width="stretch", hide_index=True)
-        st.markdown("**Project settings**")
-        settings = settings_form(f"man_{mode}", proc.settings if same else ProjectSettings(), mode)
-        st.markdown("**Validation result**")
-        p = prepare(edited, {c_: c_ for c_ in edited.columns}, settings, mode, first_data_row=1)
-        st.caption("Row numbers in messages count from 1 = first table row.")
-        show_validation(p)
-        if p.ok:
-            confirm_and_load(p, "Manually entered data", "man")
-
-    else:
-        st.caption("The demo and benchmark use SYNTHETIC data. The real project is an actual Belgian apartment "
-                   "building from the DSLIB empirical project database (Ghent University): 25 activities, "
-                   "13 tracking periods, values in EUR. Source: Batselier & Vanhoucke (2015), International "
-                   "Journal of Project Management 33(3), 697–710.")
-        ex = st.radio("Example", ["Demo project — G+7 commercial building, 6 work packages, 9 months",
-                                  "Benchmark case — G+4 residential block, 4 work packages, 2 months "
-                                  "(used for manual validation)",
-                                  "Real project — apartment building, Belgium 2011–12 (DSLIB C2014-05)"],
-                      key="example")
-        ok = st.checkbox(f"Replace the project currently shown (“{S.name}”)", key="ex_conf")
-        if st.button("Load example", type="primary", disabled=not ok):
-            st.session_state.current = (demo_project() if ex.startswith("Demo") else
-                                        real_project() if ex.startswith("Real") else benchmark_project())
-            st.session_state.flash = "Example loaded."
-            st.rerun()
+    data_loader(on_home=False)
 
 st.markdown("---")
 st.caption("CE 725 Construction Economics and Finance — EVM Dashboard. Forecasts are assumption-based estimates, "

@@ -49,9 +49,37 @@ with sync_playwright() as p:
     b = p.chromium.launch(executable_path=os.environ.get("CHROME_PATH") or None)
     page = b.new_page(viewport={"width": 1440, "height": 2600})
     page.goto(URL)
+    # ---------- home screen comes first; no project is analysed until one is opened
+    page.wait_for_selector(".hero-title", timeout=60000)
+    wait_idle(page, 2)
+    note(f"Home screen shown first: {page.locator('.signboard').count() == 0}")
+    page.screenshot(path=SHOTS / "00_home.png", full_page=True)
+
+    # ---------- real upload from the home screen (work-package file), no confirmation needed
+    page.get_by_text("Work-Package-Level Data", exact=True).click()
+    wait_idle(page)
+    page.locator('input[type="file"]').set_input_files(
+        str(ROOT / "data" / "real" / "C2014-05_apartment_building_work_packages.csv"))
+    wait_idle(page, 3)
+    page.get_by_label("Project name *").first.fill("Uploaded on home screen")
+    page.keyboard.press("Tab")
+    wait_idle(page, 2)
+    page.get_by_role("button", name="Open dashboard").click()
     page.wait_for_selector(".sb-title", timeout=60000)
     wait_idle(page, 3)
-    note(f"Loaded app; signboard: {page.locator('.signboard').inner_text()!r}")
+    note(f"Home upload opened dashboard: {sign_title(page)!r}")
+    panel = page.get_by_text("Performance and problem areas").count() > 0
+    note(f"Performance and problem areas panel shown: {panel}")
+    page.screenshot(path=SHOTS / "01b_home_upload_overview.png", full_page=True)
+
+    # ---------- back to home, then open the demo for the remaining checks
+    page.get_by_role("button", name="← Home: start another project").click()
+    page.wait_for_selector(".hero-title", timeout=60000)
+    wait_idle(page)
+    page.get_by_role("button", name="Demo project (synthetic, 6 work packages)").click()
+    page.wait_for_selector(".sb-title", timeout=60000)
+    wait_idle(page, 3)
+    note(f"Loaded demo from home; signboard: {page.locator('.signboard').inner_text()!r}")
     page.screenshot(path=SHOTS / "01_overview.png", full_page=True)
 
     for i, name in enumerate(["Trends", "Forecasts", "Commentary"], start=2):

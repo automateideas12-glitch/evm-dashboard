@@ -1,6 +1,6 @@
 # PROJECT_STATUS — CE 725 EVM Dashboard
 
-_Last updated: 21-Oct-2026. Final submission due 1-Nov-2026._
+_Last updated: 27-Oct-2026. Final submission due 1-Nov-2026._
 
 ## Objective
 Interactive, validated Earned Value Management decision-support dashboard for construction projects (Topic 7), with all course deliverables.
@@ -12,10 +12,10 @@ Working tool + source · user manual (3–5 pp) · validation report with manual
 
 | Area | Status | Evidence |
 |---|---|---|
-| Calculation engine (all Topic 7 metrics, 4 EAC methods, both TCPIs) | Tested and passed | `reports/test_results.txt` (79 passed) |
+| Calculation engine (all Topic 7 metrics, 4 EAC methods, both TCPIs) | Tested and passed | `reports/test_results.txt` (107 passed) |
 | Benchmark, two periods | 162/162 comparisons pass (3 input modes) | `reports/benchmark_comparison.md` |
 | Input: CSV/XLSX upload, mapping, validation, manual entry, 3 modes | Tested and passed (manual cell edit: see open item 3) | tests + `reports/browser_test_log.txt` |
-| Dashboard: 5 tabs, charts, commentary, exports | Tested (AppTest + browser) | `tests/test_app.py`, screenshots |
+| Home screen (upload / manual / one-click examples) then dashboard: 5 tabs, combined CPI–SPI chart, work-package status and top problem activities, commentary, exports | Tested (AppTest + browser) | `tests/test_app.py`, screenshots |
 | User manual | Done, 5 pages | `reports/user_manual.pdf` |
 | Validation report | Done; team sign-off pending | `reports/validation_report.pdf` |
 | AI usage log | 21 genuine entries from the build session; team confirmation pending | `reports/ai_usage_log.csv` |
@@ -23,9 +23,12 @@ Working tool + source · user manual (3–5 pp) · validation report with manual
 | Presentation | Outline + viva bank; slides not built | `reports/presentation_outline.md`, `reports/viva_question_bank.md` |
 
 ## Tests executed (21-Oct-2026)
-- `python -m pytest`: 79 passed (Python 3.13; Streamlit 1.66, pandas 3.0.5) and 79 passed (Streamlit 1.50, pandas 2.2.3, Plotly 5.24).
+- `python -m pytest`: 107 passed on 27-Oct-2026 (Python 3.13; Streamlit 1.66, pandas 3.0.5). Earlier: 79 passed on Streamlit 1.50 / pandas 2.2.3 / Plotly 5.24.
 - Mutation testing: 7/7 injected formula errors detected.
 - Browser (Chromium/Playwright, `tests/browser_test_playwright.py`): all tabs render; invalid upload blocked with row-level errors and project unchanged; valid CSV upload loads; manual entry reproduces benchmark P2 (CPI 0.917, SPI 0.846, EAC(A) ₹436.36 lakh, TCPI 1.077).
+
+## Change log
+- 27-Oct-2026: home screen before analysis; combined CPI and SPI chart (Overview + Trends); work-package status and top problem activities panel (`src/analysis.py`, `tests/test_analysis.py`). 7/7 injected faults in the new code detected by tests.
 
 ## Defects found and fixed
 D1 test matched a docstring · D2 project name carried across uploads · D3 duplicate error for one cell · D4 internal field name in a warning · D6 layout issues. D5 (₹0.40 precision from rounded %) documented as a limitation. Details: validation report §7.
