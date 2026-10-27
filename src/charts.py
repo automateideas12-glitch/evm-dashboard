@@ -115,6 +115,30 @@ def index_chart(res: pd.DataFrame, col: str, label: str, color: str, frequency: 
     return fig
 
 
+def combined_index_chart(res: pd.DataFrame, frequency: str, warn: float, crit: float) -> go.Figure:
+    """CPI and SPI on one chart, with the 1.00 line and the warning/critical band."""
+    d = with_gap_breaks(res, frequency)
+    fig = go.Figure()
+    fig.add_hrect(y0=crit, y1=warn, fillcolor=AMBER, opacity=0.08, line_width=0)
+    fig.add_hline(y=1.0, line=dict(color=INK, width=1), annotation_text="1.00 = on plan",
+                  annotation_position="top left")
+    fig.add_hline(y=crit, line=dict(color=CRIT, width=1, dash="dot"),
+                  annotation_text=f"critical < {crit:.2f}", annotation_position="bottom left")
+    for col, label, color in (("cpi", "CPI", AC_C), ("spi", "SPI", PV_C)):
+        fig.add_trace(go.Scatter(x=d["reporting_date"], y=d[col], name=label, mode="lines+markers",
+                                 line=dict(color=color, width=2.5), marker=dict(size=7), connectgaps=False,
+                                 hovertemplate="%{y:.3f}"))
+        undefined = res[res[f"{col}__status"] != "ok"]
+        if len(undefined):
+            fig.add_trace(go.Scatter(x=undefined["reporting_date"], y=[1.0] * len(undefined), mode="markers",
+                                     name=f"{label} undefined", marker=dict(symbol="x-open", size=10, color=GREY),
+                                     hovertext=undefined[f"{col}__note"], hoverinfo="text"))
+    fig = _layout(fig, "CPI and SPI trend", "Index (1.00 = on plan)", 420)
+    vals = pd.concat([res["cpi"], res["spi"]]).dropna()
+    fig.update_yaxes(range=[min([crit] + list(vals)) - 0.03, max([1.0] + list(vals)) + 0.04])
+    return fig
+
+
 def progress_chart(periods: pd.DataFrame, frequency: str) -> go.Figure:
     d = with_gap_breaks(periods, frequency)
     fig = go.Figure()
