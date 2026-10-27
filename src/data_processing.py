@@ -289,7 +289,12 @@ def prepare(raw: pd.DataFrame, mapping: Dict[str, Optional[str]], settings: Proj
         return out
 
     # --- build typed canonical table
-    df = pd.DataFrame({"source_row": [first_data_row + i for i in range(len(raw))]})
+    rows_attr = raw.attrs.get("row_numbers") if hasattr(raw, "attrs") else None
+    if rows_attr is not None and len(rows_attr) == len(raw):
+        source_rows = list(rows_attr)          # real spreadsheet rows, supplied by the smart reader
+    else:
+        source_rows = [first_data_row + i for i in range(len(raw))]
+    df = pd.DataFrame({"source_row": source_rows})
     for f, col in mapping.items():
         if f not in allowed:
             continue

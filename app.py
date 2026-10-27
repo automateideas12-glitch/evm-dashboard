@@ -27,6 +27,8 @@ from src.data_processing import (FIELDS, MODE_FIELDS, MODES, ProcessedData, Proj
 from src.evm_calculations import compute_results, metric_from_row
 from src.forecasting import METHODS
 from src.formatting import format_index, format_metric, format_money
+from src.smart_reader import (entry_label, understand, values_entry_table, with_entered_values,
+                              workbook_with_missing_columns)
 from src.validation import is_missing
 
 ROOT = Path(__file__).parent
@@ -225,6 +227,116 @@ def excel_export(cur: dict, r: pd.DataFrame) -> bytes:
     return bio.getvalue()
 
 
+CONF_ICON = {"High": "🟢 High", "Medium": "🟡 Medium", "Low": "🟠 Low"}
+
+
+def smart_upload(up, replace_name):
+    """Upload flow: the smart reader understands the file, the user checks it, then normal validation."""
+    data = up.getvalue()
+    fid = f"{up.name}_{len(data)}"
+    sheet = None
+    try:
+        if up.name.lower().endswith(".xlsx"):
+            names = excel_sheet_names(data)
+            if len(names) > 1:
+                pick = st.selectbox("Worksheet", ["Detect automatically"] + names, key=f"sheet_{fid}")
+                sheet = None if pick == "Detect automatically" else pick
+        detected = understand(data, up.name, sheet=sheet)
+    except Exception as exc:  # unreadable file: report, never crash or replace the project
+        st.error(f"The file could not be read: {exc}. Check that it is a valid CSV or XLSX file.")
+        return
+
+    st.markdown("**3. What the smart reader understood**")
+    modes = list(MODES)
+    up_mode = st.selectbox("Data type (detected from your columns — change it if it is wrong)", modes,
+                           index=modes.index(detected.mode), format_func=lambda m: MODES[m], key=f"upmode_{fid}")
+    u = detected if up_mode == detected.mode else understand(data, up.name, mode=up_mode, sheet=sheet)
+    with st.container(border=True):
+        facts = [f"**{MODES[u.mode]}** — {u.mode_reason}",
+                 f"{len(u.table)} data rows, header on row {u.header_row}" + (f" of sheet '{u.sheet}'" if u.sheet else "")]
+        if "status_date" in u.metadata:
+            facts.append(f"Status date found above the table: **{u.metadata['status_date']:%d %b %Y}**")
+        st.markdown("\n".join(f"- {x}" for x in facts))
+        if u.fixes:
+            st.markdown("**Fixed automatically** (shown so you can check them):\n" +
+                        "\n".join(f"- ✅ {x}" for x in u.fixes))
+        for h in u.hints:
+            st.info(h)
+        mt = pd.DataFrame([{"Dashboard field": FIELDS[m["field"]][0], "Your column": m["column"],
+                            "Confidence": CONF_ICON[m["confidence"]], "Why": m["reason"]} for m in u.matches])
+        if len(mt):
+            st.dataframe(mt, hide_index=True, width="stretch")
+        if u.unused_columns:
+            st.caption("Not used (not needed or not recognised — never guessed): " +
+                       ", ".join(f"'{c}'" for c in u.unused_columns))
+
+    # ---- anything still missing: let the user supply it here or in the file
+    if u.missing:
+        names_ = ", ".join(entry_label(f) for f in u.missing)
+        st.warning(f"Your file does not contain: **{names_}**. Add it below, or download your file with the "
+                   "missing column added, fill it in and upload it again.")
+        for f in list(u.missing):
+            if f == "reporting_date":
+                d = st.date_input("Status date of this file (the date all values refer to)", value=None,
+                                  key=f"entry_date_{fid}")
+                if d:
+                    t = values_entry_table(u, f)
+                    t[entry_label(f)] = pd.Timestamp(d)
+                    u = with_entered_values(u, f, t)
+                continue
+            st.markdown(f"**Enter {entry_label(f).lower()}**" + (" for each activity" if u.mode == "work_package"
+                                                                   else " for each reporting date"))
+            t = values_entry_table(u, f)
+            cfg = {c: st.column_config.Column(disabled=True) for c in t.columns if c != entry_label(f)}
+            cfg[entry_label(f)] = st.column_config.NumberColumn(entry_label(f), min_value=0.0, format="%.2f",
+                                                                help=FIELDS[f][1])
+            edited = st.data_editor(t, column_config=cfg, hide_index=True, width="stretch", key=f"entry_{f}_{fid}",
+                                    height=min(35 * (len(t) + 1) + 3, 735))      # all rows visible up to 20
+            u = with_entered_values(u, f, edited)
+        st.download_button("Download my file with the missing column(s) added (Excel)",
+                           workbook_with_missing_columns(u), file_name=f"{Path(up.name).stem}_to_fill.xlsx",
+                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                           key=f"dl_fill_{fid}")
+
+    raw = u.table
+    spec = MODE_FIELDS[up_mode]
+    opts = ["— not mapped —"] + list(raw.columns)
+    mapping = dict(u.mapping)
+    with st.expander("Check or change the column mapping", expanded=False):
+        st.caption("Pre-filled by the smart reader. Fields marked * are required. Columns you do not map are "
+                   "ignored, never guessed.")
+        grid = st.columns(3)
+        for i, f in enumerate(mode_fields(up_mode)):
+            lab = FIELDS[f][0] + (" *" if f in spec["required"] else "")
+            if spec["ac_choice"] and f in ("ac_cumulative", "ac_period"):
+                lab += " (one of the two AC fields required)"
+            cur_ = mapping.get(f)
+            choice = grid[i % 3].selectbox(lab, opts, index=opts.index(cur_) if cur_ in opts else 0,
+                                           key=f"map_{up_mode}_{f}_{fid}_{cur_}", help=FIELDS[f][1])
+            mapping[f] = None if choice == opts[0] else choice
+    with st.expander(f"Preview of the cleaned data ({len(raw)} rows)"):
+        st.dataframe(raw.head(50), hide_index=True, width="stretch")
+
+    st.markdown("**4. Project settings**")
+    bac_file = None
+    if mapping.get("bac"):
+        vals = {to for to in pd.to_numeric(raw[mapping["bac"]].astype(str).str.replace(",", ""),
+                                           errors="coerce").dropna()}
+        bac_file = sorted(vals)[0] if len(vals) == 1 else None
+    base = ProjectSettings()
+    if mapping.get("project_name"):
+        nm = [v for v in raw[mapping["project_name"]] if not is_missing(v)]
+        base.name = str(nm[0]).strip() if nm else ""
+    elif u.metadata.get("project_name"):
+        base.name = str(u.metadata["project_name"])
+    settings = settings_form(f"up_{up_mode}_{fid}", base, up_mode, bac_file)
+    st.markdown("**5. Validation result**")
+    p = prepare(raw, mapping, settings, up_mode)
+    show_validation(p)
+    if p.ok:
+        confirm_and_load(p, f"Uploaded file: {up.name}", "up", replace_name)
+
+
 def data_loader(on_home: bool):
     """Upload / manual entry / built-in example. Used on the home screen and in the Data tab."""
     cur_ = st.session_state.get("current")
@@ -258,54 +370,11 @@ def data_loader(on_home: bool):
                                                           "Load a built-in example"], horizontal=True, key="how")
 
     if how == "Upload a file":
-        up = st.file_uploader("Upload a CSV or Excel (.xlsx) file", type=["csv", "xlsx"], key="uploader")
+        up = st.file_uploader("Upload a CSV or Excel (.xlsx) file", type=["csv", "xlsx"], key="uploader",
+                              help="Any layout is fine: the smart reader finds the header row, the columns, the "
+                                   "data type and a status date written above the table.")
         if up is not None:
-            data = up.getvalue()
-            sheet = 0
-            try:
-                if up.name.lower().endswith(".xlsx"):
-                    names = excel_sheet_names(data)
-                    sheet = st.selectbox("Worksheet", names, key="sheet")
-                raw = read_table(data, up.name, sheet)
-            except Exception as exc:  # unreadable file: report, never crash or replace the project
-                st.error(f"The file could not be read: {exc}. Check that it is a valid CSV/XLSX with one header row.")
-                raw = None
-            if raw is not None:
-                st.markdown(f"**Preview** — {len(raw)} records, {len(raw.columns)} columns")
-                st.dataframe(raw.head(50), hide_index=True, width="stretch")
-                st.markdown("**3. Check the column mapping**")
-                st.caption("Suggested from the column names. Fields marked * are required. Columns you do not map "
-                           "are ignored, never guessed. MS Project's '% Complete' is duration-based — map it to "
-                           "actual physical progress only if it truly measures physical work.")
-                sugg = suggest_mapping(list(raw.columns), mode)
-                opts = ["— not mapped —"] + list(raw.columns)
-                spec = MODE_FIELDS[mode]
-                mapping = {}
-                grid = st.columns(3)
-                for i, f in enumerate(mode_fields(mode)):
-                    req = f in spec["required"] or (spec["ac_choice"] and f in ("ac_cumulative",))
-                    lab = FIELDS[f][0] + (" *" if f in spec["required"] else "")
-                    if spec["ac_choice"] and f in ("ac_cumulative", "ac_period"):
-                        lab += " (one of the two AC fields required)"
-                    choice = grid[i % 3].selectbox(lab, opts, index=opts.index(sugg[f]) if sugg.get(f) else 0,
-                                                   key=f"map_{mode}_{f}_{up.name}", help=FIELDS[f][1])
-                    mapping[f] = None if choice == opts[0] else choice
-                st.markdown("**4. Project settings**")
-                bac_file = None
-                if mapping.get("bac"):
-                    vals = {to for to in pd.to_numeric(raw[mapping["bac"]].astype(str).str.replace(",", ""),
-                                                       errors="coerce").dropna()}
-                    bac_file = sorted(vals)[0] if len(vals) == 1 else None
-                base = ProjectSettings()
-                if mapping.get("project_name"):
-                    nm = [v for v in raw[mapping["project_name"]] if not is_missing(v)]
-                    base.name = str(nm[0]).strip() if nm else ""
-                settings = settings_form(f"up_{mode}_{up.name}_{len(data)}", base, mode, bac_file)
-                st.markdown("**5. Validation result**")
-                p = prepare(raw, mapping, settings, mode)
-                show_validation(p)
-                if p.ok:
-                    confirm_and_load(p, f"Uploaded file: {up.name}", "up", replace_name)
+            smart_upload(up, replace_name)
 
     elif how == "Enter or edit manually":
         same = cur_proc is not None and cur_proc.mode == mode

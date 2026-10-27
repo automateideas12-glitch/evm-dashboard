@@ -1,0 +1,14 @@
+PASS: data type detected as work-package
+PASS: header found on row 4
+PASS: status date read from above the table
+PASS: totals row removed
+PASS: fractions converted
+PASS: missing actual cost reported
+PASS: validation passes after typing actual cost
+PASS: path A dashboard CPI 0.954 (expected 0.954)
+PASS: path A dashboard SPI 0.504 (expected 0.504)
+PASS: re-uploaded file: nothing missing
+PASS: re-uploaded file: validation passes
+PASS: path B dashboard CPI 0.954 (expected 0.954)
+PASS: path B dashboard SPI 0.504 (expected 0.504)
+RESULT: 0 failure(s)
