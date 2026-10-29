@@ -1,18 +1,18 @@
 Home screen shown first: True
 Home upload opened dashboard: 'Uploaded on home screen'
 Performance and problem areas panel shown: True
-Loaded demo from home; signboard: 'Critical\nDemo - G+7 commercial building (SYNTHETIC)\nStatus date 30 Sep 2026 \xa0|\xa0 Building — commercial \xa0|\xa0 Forecast method A: BAC/CPI'
+Loaded demo from home; signboard: 'Critical\nDemo - G+7 commercial building (SYNTHETIC)\nStatus date 30 Sep 2026 \xa0·\xa0 Building — commercial \xa0·\xa0 Forecast method A: BAC/CPI\nCPI\n0.947\nSPI\n0.897\nCOMPLETE\n68.4%\nEAC (A)\n₹1,266.57 lakh'
 Tab Trends rendered
 Tab Forecasts rendered
 Tab Commentary rendered
 Invalid upload: blocking errors shown & no load button = True
 Signboard after invalid upload: 'Demo - G+7 commercial building (SYNTHETIC)'
-After valid upload: signboard 'Critical\nDemo - G+7 commercial building (SYNTHETIC)\nStatus date 30 Sep 2026 \xa0|\xa0 Other \xa0|\xa0 Forecast method A: BAC/CPI'
+After valid upload: signboard 'Critical\nDemo - G+7 commercial building (SYNTHETIC)\nStatus date 30 Sep 2026 \xa0·\xa0 Other \xa0·\xa0 Forecast method A: BAC/CPI\nCPI\n0.947\nSPI\n0.897\nCOMPLETE\n68.4%\nEAC (A)\n₹1,266.57 lakh'
 Overview CPI after progress-mode upload: 'CPI (cost efficiency)\n\n0.947\n\n-0.053 vs 1.00'
 Manual entry validation passed: True
 Manual-entry benchmark -> CPI (cost efficiency): 0.917
 Manual-entry benchmark -> SPI (schedule efficiency): 0.846
 Manual-entry benchmark -> Estimate at completion (EAC): ₹436.36 lakh
 Manual-entry benchmark -> TCPI to finish within BAC: 1.077
-Editor grid box: {'x': 380, 'y': 989.546875, 'width': 980, 'height': 142}
+Editor grid box: {'x': 380, 'y': 1113.4375, 'width': 980, 'height': 142}
 After editing a cell to -5: blocking error shown = False; negative message = False

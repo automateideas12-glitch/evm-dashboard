@@ -52,7 +52,7 @@ def test_app_opens_on_home_screen_not_on_a_project():
 def test_home_offers_one_click_examples():
     at = fresh()
     labels = {b.key: b.label for b in at.button}
-    assert {"home_demo", "home_real", "home_bench"} <= set(labels)
+    assert {"home_manual", "home_demo", "home_real", "home_bench"} <= set(labels)
 
 
 def test_example_opens_whole_analysis_without_confirmation():
@@ -66,16 +66,17 @@ def test_example_opens_whole_analysis_without_confirmation():
 def test_example_chosen_in_home_loader_opens_without_confirmation():
     at = fresh()
     at.radio(key="how").set_value("Load a built-in example").run()
-    at.radio(key="example").set_value(at.radio(key="example").options[1]).run()   # benchmark
+    at.radio(key="example").set_value(next(o for o in at.radio(key="example").options if o.startswith("Benchmark"))).run()   # benchmark
     assert len(at.checkbox) == 0                     # nothing to replace yet, so nothing to confirm
     next(b for b in at.button if b.label == "Open example").click().run()
     assert not at.exception
     assert metric(at, "Budget at completion (BAC)") == "₹400.00 lakh"
 
 
-def test_home_button_returns_to_home_screen():
+def test_home_button_is_in_the_top_bar_and_returns_home():
     at = demo()
-    at.sidebar.button(key="go_home").click().run()
+    assert "top_home" not in [b.key for b in at.sidebar.button]     # visible on the page, not hidden in the sidebar
+    at.button(key="top_home").click().run()
     assert len(at.metric) == 0 and len(at.tabs) == 0
     assert any("Start a project" in s.value for s in at.subheader)
 
@@ -118,7 +119,7 @@ def test_work_package_status_and_top_problems_for_benchmark():
 def test_tables_follow_the_reporting_date():
     at = fresh()
     at.button(key="home_bench").click().run()
-    at.sidebar.selectbox[2].set_value(0).run()       # 31-Jan-2026
+    at.selectbox(key="sel_date").set_value(0).run()   # 31-Jan-2026
     wp = table(at, "Work package")
     assert list(wp["Status"])[2] == "Not started"    # WP3 has not started in January
 
@@ -127,7 +128,7 @@ def test_tables_follow_the_reporting_date():
 @pytest.mark.parametrize("method", ["A_CPI", "B_CPI_SPI", "C_BUDGET_RATE", "D_INDEPENDENT"])
 def test_every_forecast_method_renders(method):
     at = demo()
-    at.sidebar.selectbox[0].set_value(method).run()
+    at.selectbox(key="method").set_value(method).run()
     assert not at.exception
     eac = metric(at, "Estimate at completion (EAC)")
     if method == "D_INDEPENDENT":
@@ -139,17 +140,17 @@ def test_every_forecast_method_renders(method):
 def test_every_reporting_date_and_unit_renders():
     at = demo()
     for unit in ("units", "crore", "million"):
-        at.sidebar.selectbox[1].set_value(unit).run()
+        at.sidebar.selectbox(key="unit").set_value(unit).run()
         assert not at.exception
     for i in range(9):
-        at.sidebar.selectbox[2].set_value(i).run()
+        at.selectbox(key="sel_date").set_value(i).run()
         assert not at.exception
 
 
 def test_load_benchmark_example_requires_confirmation():
     at = demo()
     at.radio(key="how").set_value("Load a built-in example").run()
-    at.radio(key="example").set_value(at.radio(key="example").options[1]).run()
+    at.radio(key="example").set_value(next(o for o in at.radio(key="example").options if o.startswith("Benchmark"))).run()
     btn = next(b for b in at.button if b.label == "Load example")
     assert btn.disabled                      # cannot replace the project without confirming
     at.checkbox(key="ex_conf").check().run()
@@ -163,9 +164,48 @@ def test_load_benchmark_example_requires_confirmation():
 
 def test_independent_etc_enables_method_d():
     at = demo()
-    at.sidebar.selectbox[0].set_value("D_INDEPENDENT").run()
+    at.selectbox(key="method").set_value("D_INDEPENDENT").run()
     at.number_input(key="etc_in_8").set_value(40000000.0).run()
     next(b for b in at.button if b.label == "Apply estimate").click().run()
     assert not at.exception
     # EAC = AC 8,66,02,000 + ETC 4,00,00,000 = 12,66,02,000 = 1,266.02 lakh
     assert metric(at, "Estimate at completion (EAC)") == "₹1,266.02 lakh"
+
+
+# ---------------------------------------------------------------- top control bar
+def test_main_controls_are_on_the_page_not_only_in_the_sidebar():
+    at = demo()
+    side = [s.key for s in at.sidebar.selectbox]
+    assert "sel_date" not in side and "method" not in side
+    assert at.selectbox(key="sel_date").value == 8          # latest reporting date by default
+    assert at.selectbox(key="method").value == "A_CPI"
+
+
+# ---------------------------------------------------------------- manual-check case (real data, 4 WPs)
+def test_manual_check_case_opens_from_home():
+    at = fresh()
+    at.button(key="home_manual").click().run()
+    assert not at.exception
+    assert any("IJzertoren" in md.value for md in at.markdown)
+    assert metric(at, "CPI (cost efficiency)") == "0.954"      # 28-Feb-2014, workbook row 6
+    assert metric(at, "SPI (schedule efficiency)") == "1.000"
+    assert len(table(at, "Work package")) == 4
+
+
+def test_manual_check_case_at_the_two_benchmark_dates():
+    at = fresh()
+    at.button(key="home_manual").click().run()
+    at.selectbox(key="sel_date").set_value(1).run()            # 30-Nov-2013
+    assert (metric(at, "CPI (cost efficiency)"), metric(at, "SPI (schedule efficiency)")) == ("0.755", "0.714")
+    assert metric(at, "Estimate at completion (EAC)") == "€284,033"      # workbook: 284,033.47
+    at.selectbox(key="sel_date").set_value(2).run()            # 31-Dec-2013
+    # CPI = 111,728.57 / 156,594.45 = 0.71349 -> "0.713"
+    assert (metric(at, "CPI (cost efficiency)"), metric(at, "SPI (schedule efficiency)")) == ("0.713", "0.521")
+    assert metric(at, "Estimate at completion (EAC)") == "€300,520"      # workbook: 300,519.58
+
+
+def test_manual_check_files_can_be_downloaded_from_home():
+    at = fresh()
+    labels = [d.label for d in at.get("download_button")]
+    assert any("hand-calculation workbook" in lab.lower() for lab in labels)
+    assert any("manual check data" in lab.lower() for lab in labels)

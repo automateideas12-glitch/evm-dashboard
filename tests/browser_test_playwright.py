@@ -73,10 +73,10 @@ with sync_playwright() as p:
     page.screenshot(path=SHOTS / "01b_home_upload_overview.png", full_page=True)
 
     # ---------- back to home, then open the demo for the remaining checks
-    page.get_by_role("button", name="← Home: start another project").click()
+    page.get_by_role("button", name="← Home", exact=True).click()
     page.wait_for_selector(".hero-title", timeout=60000)
     wait_idle(page)
-    page.get_by_role("button", name="Demo project (synthetic, 6 work packages)").click()
+    page.get_by_role("button", name="Demo project", exact=True).click()
     page.wait_for_selector(".sb-title", timeout=60000)
     wait_idle(page, 3)
     note(f"Loaded demo from home; signboard: {page.locator('.signboard').inner_text()!r}")

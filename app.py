@@ -42,25 +42,47 @@ st.markdown("""
 html, body, [class*="css"], .stMarkdown, .stMetric, button, input, textarea, select {
   font-family: Barlow, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
 h1, h2, h3 { letter-spacing: -0.01em; color: #1F2A33; }
-.block-container { padding-top: 3.2rem; max-width: 1400px; }
-.signboard { display:flex; align-items:stretch; border:2px solid #1F2A33; margin: 0 0 1.2rem 0;
-  background:#fff; }
-.signboard .sb-state { padding: .9rem 1.4rem; font-size: 1.9rem; font-weight: 700; color:#fff;
-  min-width: 13rem; display:flex; align-items:center; }
-.signboard .sb-body { padding: .7rem 1.2rem; display:flex; flex-direction:column; justify-content:center; }
-.signboard .sb-title { font-size: 1.35rem; font-weight: 600; color:#1F2A33; line-height:1.2; }
-.signboard .sb-meta { font-size: .98rem; color:#4A5560; margin-top:.15rem; }
+.block-container { padding-top: 2.4rem; max-width: 1400px; }
+.topbar-brand { font-size:.78rem; font-weight:700; letter-spacing:.14em; color:#4C6A92; text-transform:uppercase; }
+.topbar-title { font-size:1.45rem; font-weight:700; color:#1F2A33; line-height:1.15; }
+.signboard { display:flex; align-items:stretch; margin: .4rem 0 1.1rem 0; background:#fff; border-radius:14px;
+  overflow:hidden; border:1px solid #E3E7EB; box-shadow:0 2px 10px rgba(16,24,40,.07); flex-wrap:wrap; }
+.signboard .sb-state { padding: 1rem 1.5rem; font-size: 1.7rem; font-weight: 700; color:#fff;
+  min-width: 12rem; display:flex; align-items:center; letter-spacing:.01em; }
+.signboard .sb-body { padding: .8rem 1.3rem; display:flex; flex-direction:column; justify-content:center; flex:1; }
+.signboard .sb-title { font-size: 1.3rem; font-weight: 700; color:#1F2A33; line-height:1.2; }
+.signboard .sb-meta { font-size: .95rem; color:#5B6670; margin-top:.2rem; }
+.sb-chips { display:flex; gap:.6rem; align-items:center; padding:.7rem 1.1rem; flex-wrap:wrap; }
+.sb-chip { background:#F6F7F5; border:1px solid #E3E7EB; border-radius:10px; padding:.35rem .8rem; min-width:6.2rem; }
+.sb-chip span { display:block; font-size:.72rem; color:#5B6670; text-transform:uppercase; letter-spacing:.06em; font-weight:600; }
+.sb-chip b { font-size:1.15rem; color:#1F2A33; }
+.sb-chip.bad b { color:#B3261E; } .sb-chip.good b { color:#2E7D4F; } .sb-chip.warn b { color:#8A6100; }
+[data-testid="stMetric"] { background:#fff; border-radius:12px; padding:.85rem 1rem;
+  box-shadow:0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06); }
+[data-testid="stMetricLabel"] p { font-size:.9rem; color:#5B6670; font-weight:600; }
+.stTabs [data-baseweb="tab-list"] { gap:.35rem; border-bottom:1px solid #E3E7EB; }
+.stTabs [data-baseweb="tab"] { padding:.5rem 1.1rem; border-radius:10px 10px 0 0; font-weight:600; font-size:1rem; }
+.stTabs [aria-selected="true"] { background:#fff; color:#1F2A33; }
+.st-key-perf_panel { border-radius:16px !important; background:#FBFCFC;
+  box-shadow:0 2px 10px rgba(16,24,40,.06); padding:1.1rem 1.1rem .6rem 1.1rem !important; }
+div[data-testid="stPlotlyChart"] { background:#fff; border-radius:12px; padding:.35rem .5rem; }
 .sb-Favourable .sb-state { background:#2E7D4F; }
 .sb-Warning .sb-state { background:#E3A008; color:#1F2A33; }
 .sb-Critical .sb-state { background:#B3261E; }
 .sb-Insufficient .sb-state { background:#6B7280; }
 .demo-note { border-left: 4px solid #E3A008; background:#FFF8E6; padding:.55rem .9rem; margin-bottom:1rem;
   color:#1F2A33; }
-[data-testid="stMetricValue"] { font-size: 1.55rem; font-weight: 600; }
+[data-testid="stMetricValue"] { font-size: 1.55rem; font-weight: 700; color:#1F2A33; }
 .section-intro { color:#4A5560; margin-top:-.4rem; margin-bottom:.6rem; max-width: 75ch; }
-.hero { border:2px solid #1F2A33; background:#fff; padding:1.2rem 1.5rem; margin-bottom:1.2rem; }
-.hero-title { font-size:2.2rem; font-weight:700; color:#1F2A33; line-height:1.1; }
-.hero-sub { font-size:1.05rem; color:#4A5560; margin-top:.35rem; max-width:80ch; }
+.hero { background:linear-gradient(135deg,#1F2A33 0%,#2B3B4A 55%,#3A4F63 100%); border-radius:18px;
+  padding:1.7rem 2rem; margin-bottom:1.4rem; box-shadow:0 6px 24px rgba(16,24,40,.18); }
+.hero-kicker { font-size:.78rem; font-weight:700; letter-spacing:.16em; color:#9FB4CC; text-transform:uppercase; }
+.hero-title { font-size:2.3rem; font-weight:700; color:#FFFFFF; line-height:1.1; margin-top:.2rem; }
+.hero-sub { font-size:1.05rem; color:#D7DEE5; margin-top:.45rem; max-width:80ch; }
+.hero-tags { margin-top:.9rem; }
+.hero-tags span { display:inline-block; background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.18);
+  color:#EEF2F6; padding:.22rem .7rem; border-radius:999px; margin:0 .4rem .4rem 0; font-size:.85rem; }
+.qs-note { color:#5B6670; font-size:.9rem; margin:-.2rem 0 .6rem 0; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -113,6 +135,19 @@ def real_project() -> dict:
                         reporting_frequency="Irregular")
     p = load_dataset(DATA / "real" / "C2014-05_apartment_building_work_packages.csv", "work_package", s, "real")
     return make_current(p, "REAL project data — DSLIB C2014-05 (Batselier & Vanhoucke, 2015)")
+
+
+MANUAL_CSV = DATA / "real" / "C2015-33_ijzertoren_manual_check_work_packages.csv"
+MANUAL_XLSX = DATA / "manual_check" / "IJzertoren_manual_check_workbook.xlsx"
+
+
+def manual_check_project() -> dict:
+    s = ProjectSettings(project_type="Infrastructure", currency="EUR",
+                        baseline_start=datetime(2013, 10, 14).date(), baseline_finish=datetime(2013, 12, 20).date(),
+                        reporting_frequency="Monthly")
+    p = load_dataset(MANUAL_CSV, "work_package", s, "manual")
+    return make_current(p, "REAL project data — manual check case, DSLIB C2015-33 grouped into 4 work packages "
+                           "(Batselier & Vanhoucke, 2015)")
 
 
 def benchmark_project() -> dict:
@@ -445,14 +480,16 @@ def data_loader(on_home: bool):
                    "building from the DSLIB empirical project database (Ghent University): 25 activities, "
                    "13 tracking periods, values in EUR. Source: Batselier & Vanhoucke (2015), International "
                    "Journal of Project Management 33(3), 697–710.")
-        ex = st.radio("Example", ["Demo project — G+7 commercial building, 6 work packages, 9 months",
+        ex = st.radio("Example", ["Manual check case — real project, 4 work packages, 5 months (DSLIB C2015-33)",
+                                  "Demo project — G+7 commercial building, 6 work packages, 9 months",
                                   "Benchmark case — G+4 residential block, 4 work packages, 2 months "
                                   "(used for manual validation)",
                                   "Real project — apartment building, Belgium 2011–12 (DSLIB C2014-05)"],
                       key="example")
         ok = on_home or st.checkbox(f"Replace the project currently shown (“{replace_name}”)", key="ex_conf")
         if st.button("Open example" if on_home else "Load example", type="primary", disabled=not ok):
-            st.session_state.current = (demo_project() if ex.startswith("Demo") else
+            st.session_state.current = (manual_check_project() if ex.startswith("Manual") else
+                                        demo_project() if ex.startswith("Demo") else
                                         real_project() if ex.startswith("Real") else benchmark_project())
             st.session_state.flash = "Example loaded."
             st.rerun()
@@ -464,20 +501,37 @@ def home_screen():
         st.markdown("### EVM Dashboard")
         st.caption(f"CE 725 course project · v{__version__}")
         st.caption("Start a project on the home screen. The analysis opens once data is loaded.")
-    st.markdown('<div class="hero"><div class="hero-title">EVM Dashboard</div>'
-                '<div class="hero-sub">Earned Value Management for construction projects: compare planned '
-                'progress, earned value and actual cost, spot problems early and forecast the final cost.</div>'
-                '</div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero"><div class="hero-kicker">CE 725 · Construction Economics and Finance</div>'
+                '<div class="hero-title">Earned Value Management Dashboard</div>'
+                '<div class="hero-sub">Compare planned progress, earned value and actual cost, spot cost and '
+                'schedule problems early, and forecast the final cost of a construction project.</div>'
+                '<div class="hero-tags"><span>PV · EV · AC</span><span>CPI · SPI</span><span>EAC · ETC · TCPI</span>'
+                '<span>Work-package problems</span><span>Smart file reader</span><span>Validated against hand '
+                'calculation</span></div></div>', unsafe_allow_html=True)
     data_loader(on_home=True)
     st.divider()
-    st.markdown("**Or open an example project in one click**")
-    q = st.columns(3)
-    for col, key, lab, fn in ((q[0], "home_demo", "Demo project (synthetic, 6 work packages)", demo_project),
-                              (q[1], "home_real", "Real project (DSLIB C2014-05, Belgium)", real_project),
-                              (q[2], "home_bench", "Benchmark case (manual validation)", benchmark_project)):
-        if col.button(lab, key=key, width="stretch"):
+    st.markdown("**Or open a ready-made project in one click**")
+    st.markdown('<div class="qs-note">The manual check case is a real project small enough to verify every number '
+                'by hand: download its hand-calculation workbook below.</div>', unsafe_allow_html=True)
+    q = st.columns(4)
+    examples = (
+        (q[0], "home_manual", "Manual check case (real)", manual_check_project,
+         "Real project DSLIB C2015-33 grouped into 4 work packages, 5 monthly reports: every number can be "
+         "checked by hand with the workbook below."),
+        (q[1], "home_demo", "Demo project", demo_project, "Synthetic G+7 commercial building, 6 work packages, 9 months."),
+        (q[2], "home_real", "Real project (25 activities)", real_project,
+         "DSLIB C2014-05 apartment building, Belgium 2011-12, 13 progress reports."),
+        (q[3], "home_bench", "Benchmark case", benchmark_project,
+         "Synthetic G+4 residential block, 4 work packages, 2 months: the original paper benchmark."))
+    for col, key, lab, fn, tip in examples:
+        if col.button(lab, key=key, width="stretch", help=tip, type="primary" if key == "home_manual" else "secondary"):
             st.session_state.current = fn()
             st.rerun()
+    d = st.columns(4)
+    d[0].download_button("Manual check data (CSV)", MANUAL_CSV.read_bytes(), MANUAL_CSV.name, "text/csv",
+                         width="stretch")
+    d[1].download_button("Hand-calculation workbook (Excel)", MANUAL_XLSX.read_bytes(), MANUAL_XLSX.name,
+                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", width="stretch")
 
 # ---------------------------------------------------------------- main flow
 if "current" not in st.session_state:
@@ -489,26 +543,32 @@ proc: ProcessedData = cur["processed"]
 S: ProjectSettings = proc.settings
 res = current_results(cur)
 
-# ---------------------------------------------------------------- sidebar
-with st.sidebar:
-    st.markdown("### EVM Dashboard")
-    st.caption(f"CE 725 course project · v{__version__}")
-    if st.button("← Home: start another project", key="go_home", width="stretch"):
-        del st.session_state["current"]
-        st.rerun()
-    method = st.selectbox("Forecasting method (EAC)", list(METHODS), index=0,
+# ---------------------------------------------------------------- top control bar (always visible)
+dates = list(res["reporting_date"])
+bar = st.columns([2.4, 1.25, 1.75, 0.9], vertical_alignment="bottom")
+bar[0].markdown('<div class="topbar-brand">EVM Dashboard · CE 725</div>'
+                '<div class="topbar-title">Project status</div>', unsafe_allow_html=True)
+sel_i = bar[1].selectbox("Reporting date", range(len(dates)), index=len(dates) - 1, key="sel_date",
+                         format_func=lambda i: pd.Timestamp(dates[i]).strftime("%d %b %Y"),
+                         help="All figures are cumulative to this status date.")
+method = bar[2].selectbox("Forecasting method (EAC)", list(METHODS), index=0, key="method",
                           format_func=lambda k: f"{k[0]} — {METHODS[k]['short']}",
-                          help="Each method makes a different assumption about future performance. "
-                               "See the Forecasts tab to compare them.")
-    st.caption(METHODS[method]["assumption"])
-    unit = st.selectbox("Show money in", ["units", "lakh", "crore", "million"],
+                          help="Each method makes a different assumption about future performance; see the "
+                               "Forecasts tab to compare them.")
+if bar[3].button("← Home", key="top_home", width="stretch", help="Back to the home screen to start another project"):
+    del st.session_state["current"]
+    st.rerun()
+
+# ---------------------------------------------------------------- sidebar: display settings
+with st.sidebar:
+    st.markdown("### Display settings")
+    st.caption(f"EVM Dashboard · CE 725 · v{__version__}")
+    st.caption(f"Method {method[0]}: {METHODS[method]['assumption']}")
+    unit = st.selectbox("Show money in", ["units", "lakh", "crore", "million"], key="unit",
                         index=1 if S.currency == "INR" else 0,
                         format_func=lambda u: {"units": f"{S.currency} (full)", "lakh": f"{S.currency} lakh",
                                                "crore": f"{S.currency} crore", "million": f"{S.currency} million"}[u],
                         help="Display only. Calculations always use full precision.")
-    dates = list(res["reporting_date"])
-    sel_i = st.selectbox("Reporting date", range(len(dates)), index=len(dates) - 1,
-                         format_func=lambda i: pd.Timestamp(dates[i]).strftime("%d %b %Y"))
     with st.expander("Health screening thresholds"):
         st.caption("Team-chosen screening rules, not industry standards. Adjust to your organisation's policy.")
         warn = st.number_input("CPI/SPI warning below", 0.5, 1.5, 1.00, 0.01)
@@ -531,22 +591,39 @@ health = classify(row, method, th)
 state_cls = {FAVOURABLE: "Favourable", WARNING: "Warning", CRITICAL: "Critical", INSUFFICIENT: "Insufficient"}
 
 # ---------------------------------------------------------------- signboard
+def _chip(label, m, kind, good_if_above=None):
+    txt = format_metric(m, kind, S.currency, unit)
+    cls = ""
+    if good_if_above is not None and m.available:
+        cls = "good" if m.value >= good_if_above else ("bad" if m.value < 0.9 * good_if_above else "warn")
+    return f'<div class="sb-chip {cls}"><span>{label}</span><b>{txt}</b></div>'
+
+
+chips = "".join([_chip("CPI", M("cpi"), "index", 1.0), _chip("SPI", M("spi"), "index", 1.0),
+                 _chip("Complete", M("pct_complete"), "pct"),
+                 _chip(f"EAC ({method[0]})", M(f"eac_{method}"), "money")])
 st.markdown(f"""
 <div class="signboard sb-{state_cls[health['overall']]}">
   <div class="sb-state">{health['overall']}</div>
   <div class="sb-body">
     <div class="sb-title">{S.name}</div>
-    <div class="sb-meta">Status date {pd.Timestamp(sel_date).strftime('%d %b %Y')} &nbsp;|&nbsp;
-      {S.project_type} &nbsp;|&nbsp; Forecast method {method[0]}: {METHODS[method]['short']}</div>
+    <div class="sb-meta">Status date {pd.Timestamp(sel_date).strftime('%d %b %Y')} &nbsp;·&nbsp;
+      {S.project_type} &nbsp;·&nbsp; Forecast method {method[0]}: {METHODS[method]['short']}</div>
   </div>
+  <div class="sb-chips">{chips}</div>
 </div>""", unsafe_allow_html=True)
-if cur["label"].startswith("REAL"):
+if "manual check case" in cur["label"]:
+    st.markdown('<div class="demo-note">Real project data (DSLIB C2015-33, Batselier &amp; Vanhoucke, 2015), 12 '
+                'activities grouped into 4 work packages, values in EUR. Percentages are rounded to 2 decimals so every '
+                'figure can be checked by hand: download the hand-calculation workbook from the home screen.</div>',
+                unsafe_allow_html=True)
+elif cur["label"].startswith("REAL"):
     st.markdown('<div class="demo-note">Real project data from the DSLIB empirical project database '
                 '(Batselier &amp; Vanhoucke, 2015), values in EUR. Results reproduce the EVM values recorded '
                 'in ProTrack for every tracking period.</div>', unsafe_allow_html=True)
 elif "synthetic" in cur["label"].lower():
     st.markdown('<div class="demo-note">You are viewing an illustrative project built from synthetic data. '
-                'Load your own data from <b>Home</b> (sidebar) or the <b>Data</b> tab.</div>', unsafe_allow_html=True)
+                'Load your own data with <b>← Home</b> (top right) or the <b>Data</b> tab.</div>', unsafe_allow_html=True)
 
 t_over, t_trend, t_fc, t_comm, t_data = st.tabs(["Overview", "Trends", "Forecasts", "Commentary", "Data"])
 
@@ -580,7 +657,7 @@ def _style_low_index(v):
 
 def performance_panel():
     """S-curve + combined CPI/SPI trend, then work-package status + top problem activities."""
-    with st.container(border=True):
+    with st.container(border=True, key="perf_panel"):
         st.subheader("Performance and problem areas")
         freq_ = S.reporting_frequency
         a, b = st.columns([1.35, 1])
@@ -592,7 +669,7 @@ def performance_panel():
             st.info("Work-package status and top problem activities need work-package data (input type "
                     f"'{MODES['work_package']}'). This project was loaded as project-level data.")
             return
-        a, b = st.columns([1, 1.15])
+        a, b = st.columns([1.1, 1.1])
         wps = work_package_status(proc.wp_detail, sel_date, th)
         label = (wps["activity_id"] + " " + wps["activity_name"]).str.strip()
         idx = lambda v, s_: "–" if s_ == NOT_STARTED else format_index(v)  # noqa: E731
@@ -603,7 +680,11 @@ def performance_panel():
         with a:
             st.markdown("**Work package status**")
             st.dataframe(view.style.map(_style_status, subset=["Status"])
-                         .map(_style_low_index, subset=["CPI", "SPI"]), hide_index=True, width="stretch")
+                         .map(_style_low_index, subset=["CPI", "SPI"]), hide_index=True, width="stretch",
+                         column_config={"Work package": st.column_config.TextColumn(width=215),
+                                        "CPI": st.column_config.TextColumn(width=62),
+                                        "SPI": st.column_config.TextColumn(width=62),
+                                        "Status": st.column_config.TextColumn(width=118)})
         top = problem_activities(proc.wp_detail, sel_date, n=5)
         with b:
             st.markdown("**Top problem activities**")
@@ -613,7 +694,11 @@ def performance_panel():
                 tv = pd.DataFrame({"Activity": (top["activity_id"] + " " + top["activity_name"]).str.strip(),
                                    "Main issue": top["main_issue"],
                                    "CV": [money(v) for v in top["cv"]], "SV": [money(v) for v in top["sv"]]})
-                st.dataframe(tv.style.map(_style_negative, subset=["CV", "SV"]), hide_index=True, width="stretch")
+                st.dataframe(tv.style.map(_style_negative, subset=["CV", "SV"]), hide_index=True, width="stretch",
+                             column_config={"Activity": st.column_config.TextColumn(width=190),
+                                            "Main issue": st.column_config.TextColumn(width=112),
+                                            "CV": st.column_config.TextColumn(width=76),
+                                            "SV": st.column_config.TextColumn(width=76)})
         st.caption(f"Status per work package uses the sidebar thresholds (Warning below "
                    f"{th.index_warning_below:.2f}, Critical below {th.index_critical_below:.2f}, worst of CPI and "
                    "SPI). Problems are ranked by the more negative of CV and SV.")
