@@ -52,6 +52,9 @@ def test_single_reporting_date_is_explained_not_drawn_as_an_empty_trend(res):
     one = r.iloc[[2]].reset_index(drop=True)
     for fig in (cumulative_chart(one, p.bac, "A_CPI", "EUR", "units", "Monthly"),
                 combined_index_chart(one, "Monthly", 1.0, 0.9)):
-        notes = " ".join(a.text for a in fig.layout.annotations)
-        assert "one reporting date" in notes.lower()
+        # The note sits under the axis (x-axis title), not as a box inside the plot where it covered
+        # the BAC / EAC / status-date labels (screenshot review 29-Oct).
+        assert "one reporting date" in (fig.layout.xaxis.title.text or "").lower()
+        notes = " ".join(a.text or "" for a in fig.layout.annotations)
+        assert "one reporting date" not in notes.lower()
         assert len(fig.layout.xaxis.tickvals) == 1

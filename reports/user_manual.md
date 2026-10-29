@@ -1,139 +1,101 @@
 ---
 title: "EVM Dashboard — User Manual"
-subtitle: "CE 725 Construction Economics and Finance · Course project, Topic 7"
+subtitle: "CE 725 Construction Economics and Finance · Course project, Topic 7 · version of 29-Oct-2026"
 ---
 
 # 1. Purpose and intended users
 
-The EVM Dashboard tells a project team, at each monthly (or weekly) status date, whether a construction project is earning the value it planned to and at what cost, and what the final cost is likely to be under clearly stated assumptions. It is intended for project managers, construction managers, project-controls engineers, contractors, clients/owners and quantity surveyors. It supports judgement; it does not replace it.
+The EVM Dashboard tells a project team, at each status date, whether a construction project is earning the value it planned to and at what cost, which work packages cause the problem, and what the final cost is likely to be under clearly stated assumptions. It is intended for project managers, construction managers, project-controls engineers, contractors, clients and quantity surveyors. It supports judgement; it does not replace it.
 
-# 2. System requirements and launch
+# 2. Starting the tool
 
-- Python 3.10 or later (tested on 3.13), and a modern browser.
-- Install once, then launch:
+Online: open the team's Streamlit link. Locally (Python 3.10+, tested on 3.13):
 
 ```bash
-cd evm_dashboard
 python -m pip install -r requirements.txt
 streamlit run app.py
 ```
 
-The dashboard opens at `http://localhost:8501` on a **home screen**. Upload a file, enter data manually, or open an example project (demo, real DSLIB project or benchmark case) in one click; the analysis opens once a project is loaded. Use **Home** in the sidebar to start another project. No internet connection is needed for any calculation.
+The app opens on the **home screen** (Figure 1). Nothing is analysed until you start a project in one of three ways: **upload a file**, **enter data manually**, or **open a ready-made project**. All calculations run on the machine running the app; no internet or AI service is used.
 
-# 3. Screen layout
+![Home screen: upload, manual entry and one-click projects, including the manual check case and its hand-calculation workbook](screenshots/m_home.png){width=50%}
 
-![Overview screen: status signboard, sidebar controls and KPI tiles](screenshots/m_overview.png){width=66%}
+# 3. Ready-made projects
 
-- **Signboard** (top): overall health label, project, status date and forecast method.
-- **Sidebar**: forecast method (A–D), money display unit (full, lakh, crore, million — display only), reporting date to view, and health thresholds.
-- **Tabs**: Overview, Trends, Forecasts, Commentary, Data.
-
-# 4. Setting up a project — the Data tab
-
-**Step 1 — choose the kind of data you have.**
-
-| Mode | You supply | The tool derives |
+| Button | What it is | Use it to |
 |---|---|---|
-| Progress-Based Project Data | BAC, cumulative planned %, cumulative actual **physical** %, AC | PV = planned % × BAC; EV = actual % × BAC |
-| Pre-calculated EVM Data | cumulative PV, EV, AC (e.g. exported from scheduling software) | nothing — supplied values are used as-is |
-| Work-Package-Level Data | budget, planned %, actual %, cumulative AC per work package per date | budget-weighted PV and EV, summed AC |
+| **Manual check case (real)** | Real project (DSLIB C2015-33, Belgium 2013–14): 12 activities grouped into 4 work packages, 5 month-end reports, budget €214,418; finished 2 months late and 4.8 % over budget | Check every number by hand with the **hand-calculation workbook** (download on the home screen) and demonstrate every feature |
+| Demo project | Synthetic G+7 building, 6 work packages, 9 months | Practise |
+| Real project (25 activities) | DSLIB C2014-05 apartment building, 13 reports | Larger real case |
+| Benchmark case | Synthetic G+4 block, 4 work packages, 2 months | The original paper benchmark |
 
-Download the **template** for your mode (or a **sample dataset**) from the buttons under Step 1. Blank templates are also in `templates/`.
+# 4. Your own data
 
-**Step 2 — provide the data.**
+**Step 1 – kind of data.** *Progress-based* (BAC, cumulative planned %, actual physical %, AC → the tool derives PV and EV), *Pre-calculated* (cumulative PV, EV, AC used as supplied) or *Work-package* (budget, planned %, actual %, cumulative AC for each package at each date → budget-weighted PV and EV). Templates and samples download under Step 1; blank templates are also in `templates/`.
 
-*Upload a file* (CSV or .xlsx; choose the worksheet for Excel). The tool shows a preview, suggests a **column mapping** from your headers (check it — unmapped columns are ignored, never guessed), asks for **project settings** (name, type, currency, BAC if not in the file, baseline dates, reporting frequency, date format), then shows the **validation result**: records read, records without errors, blocking errors, warnings, and a table giving the row, field, problem and how to fix it. If there are blocking errors there is no load button and the project already shown is not changed. If validation passes, tick *Replace the project currently shown* and press **Load into dashboard**.
+**Step 2 – upload.** Upload the CSV or Excel file *as it is*. The **smart reader** (rule-based, offline) shows what it understood before anything is calculated (Figure 2):
 
-![Validation of a faulty upload: five blocking errors with row numbers; the load button is withheld](screenshots/m_invalid_upload.png){width=78%}
+- the **data type** detected from your columns (change it if wrong), the **header row** even when titles sit above the table, and a **status date** written above the table, which becomes the reporting date of every row;
+- **fixes made automatically**, each listed so you can check it: total rows removed, fractions (0.75) converted to 75 %, "137 lakh" / "4 crore" converted to full amounts;
+- **column matches** with a confidence and reason. A column is matched only if both its header and its values fit; unknown columns are never guessed; MS Project's bare "% Complete" (duration-based) is not used as physical progress;
+- if your file has its **own PV/EV columns**, they are cross-checked row by row against budget × progress %;
+- **missing data** (often actual cost): type the values in the table shown, or download your file with the column added, fill it and upload again.
 
-*Enter or edit manually* — an editable table with only the columns your mode needs (`*` = required). Add rows with the **+** control. *Reload from current project* edits the loaded data; *Start a new blank table* (tick the confirmation first) clears it. The same validation rules as uploads apply, and nothing reaches the dashboard until you load it.
+![Smart reader on a site sheet: header found on row 4, status date read from the cell above the table, fractions converted, totals row removed, PV/EV cross-checked](screenshots/m_smart_reader.png){width=55%}
 
-*Load a built-in example* — the demonstration project or the two-period benchmark case used for validation.
+**Step 3 – settings and validation.** Enter the project name, type, currency, baseline dates and reporting frequency. The validation result lists blocking errors and warnings with the **row number of your original spreadsheet** and how to fix each one. If anything blocks, there is no *Open dashboard* button. *Enter or edit manually* gives an editable table with the same checks.
 
-**Exports** (top of the Data tab): Results (CSV), Inputs (CSV) and a Workbook (Excel) containing project settings, validated inputs, reporting periods, all results with status notes, work-package detail and validation messages.
+**Input rules.** Values are **cumulative** to the status date (if you only have monthly costs, use `ac_period`). Actual progress is **physical** (share of budgeted scope done), not time elapsed. A blank is missing, not zero. In work-package data every package appears at every date with a constant budget.
 
-# 5. Input rules that matter
+# 5. The dashboard
 
-- **Cumulative means to-date totals.** Never add cumulative values; if you only have monthly costs, use the `ac_period` column and the tool will total them.
-- **Actual progress is physical**: the share of budgeted scope completed (quantities installed, milestones achieved). Time elapsed and MS Project's "% Complete" (a duration measure) are not physical progress.
-- **Blank is missing, not zero.** A missing required value blocks loading. An AC of genuinely zero is allowed but makes CPI undefined.
-- **Percentages are 0–100.** 0.45 means 0.45%, not 45% (the tool warns if all values look like fractions).
-- **Work-package data:** every work package at every date; budgets constant; use a zero-budget package for unallocated costs.
+The **top bar** is always visible: reporting date, forecasting method (A–D) and **← Home** to start another project. The **sidebar** holds display settings only: money unit (full, lakh, crore, million — display only) and the health thresholds. The **banner** shows the overall health and the key figures (CPI, SPI, % complete, EAC).
 
-# 6. Reading the results
+![Overview of the manual check case at 31 Dec 2013: top bar, health banner with key figures, KPI cards](screenshots/m_overview.png){width=62%}
 
 | Measure | Meaning | Good sign |
 |---|---|---|
 | PV / EV / AC | Budgeted value scheduled / budgeted value earned / cost actually spent (cumulative) | — |
 | CV = EV − AC | Cost gain (+) or loss (−) on the work done | ≥ 0 |
-| SV = EV − PV | Value of work ahead (+) or behind (−) plan — **money, not days** | ≥ 0 |
-| CPI = EV/AC | Value earned per rupee spent | ≥ 1.00 |
-| SPI = EV/PV | Rate of earning value versus plan | ≥ 1.00 |
-| EAC, ETC, VAC | Forecast final cost, cost still to spend, budget minus forecast | VAC ≥ 0 |
+| SV = EV − PV | Value of work ahead (+) or behind (−) plan — money, not days | ≥ 0 |
+| CPI = EV / AC | Value earned per rupee (euro) spent | ≥ 1.00 |
+| SPI = EV / PV | Rate of earning value versus plan | ≥ 1.00 |
+| EAC, ETC, VAC | Forecast final cost; cost still to spend; budget minus forecast | VAC ≥ 0 |
 | TCPI to BAC | Efficiency the remaining work needs to finish within BAC | close to CPI |
 
-**Undefined** means the value cannot be calculated (e.g. CPI when AC = 0) and the reason is in the ⓘ tooltip; **N/A** means the measure does not apply (e.g. TCPI once all work is earned); **⚠** means a value is shown but should be reviewed. None of these is ever shown as zero.
+**Undefined** = cannot be calculated (e.g. CPI when AC = 0; the ⓘ tooltip says why). **N/A** = does not apply (e.g. TCPI once all work is earned). Neither is ever shown as zero.
 
-**Health signboard.** Defaults: CPI or SPI below 1.00 = Warning, below 0.90 = Critical; forecast overrun above 0% = Warning, above 10% = Critical. The overall label is Critical if any indicator is critical, *Insufficient data* if any indicator cannot be calculated, otherwise the worst of the rest. These are adjustable screening rules, not industry standards.
+**Health.** Defaults: CPI or SPI below 1.00 = Warning, below 0.90 = Critical; forecast overrun above 0 % = Warning, above 10 % = Critical. Overall = Critical if any indicator is critical, *Insufficient data* if any cannot be calculated, otherwise the worst of the rest. These are adjustable screening rules, not industry standards.
 
-# 7. Forecasting methods (Forecasts tab)
+**Performance and problem areas** (Figure 4): the S-curve (PV, EV, AC with BAC, forecast EAC, status date and baseline finish) beside one combined CPI and SPI chart over red/amber/green zones; then, for work-package data, the **status of each work package** (worst of its CPI and SPI; *Not started* when nothing is planned, earned or spent) and the **top problem activities**, ranked by the more negative of CV and SV. With a single reporting date the charts say so instead of drawing an empty trend.
+
+![Performance and problem areas, manual check case at 31 Dec 2013](screenshots/m_panel.png){width=62%}
+
+**Other tabs.** *Trends*: S-curve, CPI/SPI, planned vs actual progress, budget vs forecast, variance by work package, period table. *Forecasts*: methods A–D side by side, EAC over time, and the independent estimate for method D. *Commentary*: plain-English text generated by fixed rules (facts, change since last report, forecast, suggested investigations, caveats); it never claims a cause the data cannot show; download as Markdown. *Data*: exports (results CSV, inputs CSV, Excel workbook with all results and validation messages) and loading a different project.
 
 | Method | Formula | Use when |
 |---|---|---|
 | A | EAC = BAC / CPI | past cost efficiency is expected to continue |
-| B | EAC = AC + (BAC − EV)/(CPI × SPI) | recovering the schedule is expected to cost extra (usually the most pessimistic) |
-| C | EAC = AC + (BAC − EV) | the past variance was a one-off and its cause has been removed (optimistic) |
-| D | EAC = AC + your ETC | the team has re-estimated the remaining work bottom-up |
+| B | EAC = AC + (BAC − EV) / (CPI × SPI) | recovering the schedule will cost extra (usually most pessimistic) |
+| C | EAC = AC + (BAC − EV) | the past variance was a one-off (optimistic) |
+| D | EAC = AC + your ETC | the team re-estimated the remaining work bottom-up (enter it in the Forecasts tab) |
 
-The Forecasts tab compares all four side by side, charts BAC against each EAC and shows how EAC has moved over time. For method D, enter the independent ETC for the selected date and press **Apply estimate**; it is labelled user-entered in exports and lasts for the session.
+# 6. Checking the tool by hand (manual check case)
 
-![Trends tab: cumulative PV/EV/AC with BAC and forecast EAC; CPI and SPI trends](screenshots/m_trends.png){width=62%}
+Open **Manual check case (real)** and download the **hand-calculation workbook**. Pick a reporting date in the top bar and compare each figure with the same row of the workbook's *Project calculation* sheet; every cell is a visible Excel formula. At 31 Dec 2013, for example: BAC €214,417.71, PV €214,417.71, EV €111,728.57, AC €156,594.45, CPI 0.713, SPI 0.521, EAC (A) €300,519.58. The *Forecast check* sheet compares each forecast with the real final cost (€224,789.67) and the *Feature tour* sheet lists which feature to show at which date.
 
-# 8. Charts (Trends tab)
-
-Cumulative PV/EV/AC with BAC and the forecast EAC (dashed); one combined CPI and SPI trend chart with the 1.00 reference and critical line; planned vs actual progress; budget vs forecast final cost; and, for work-package data, CV and SV by work package. Solid lines are observed data, dashed lines are forecasts, and a missing reporting period appears as a break rather than a joined line.
-
-# 9. Commentary tab
-
-Plain-English text generated by fixed rules from the numbers: observed facts, change since the previous report, the forecast and its assumption, suggested investigations, and caveats. It never states a cause the data cannot show (it will say cost efficiency is unfavourable, not that labour productivity fell). Notes you entered for the period are quoted and marked as unverified. Download it as Markdown for a monthly report.
-
-# 10. Common messages and troubleshooting
+# 7. Troubleshooting
 
 | Message | What to do |
 |---|---|
-| Required column '…' is not mapped | Map it in Step 3 or add the column from the template. |
-| '…' is not a number | Remove text from the numeric cell; plain numbers, separators and ₹ are fine. |
-| outside the allowed 0–100% range | Progress must be a percentage of scope between 0 and 100. |
-| Duplicate reporting date | Keep one row per date (per work package in WP mode). |
-| Work package(s) … have no record for … | Repeat the unchanged cumulative values for that WP and date. |
+| Required column … is not mapped / file does not contain … | Map it under *Check or change the column mapping*, add the column, or type the values in the table shown. |
+| … is not a number / outside 0–100 % | Remove text from numeric cells; progress must be 0–100 %. |
+| Duplicate reporting date | One row per date (per work package in work-package data). |
+| Work package(s) … have no record for … | Repeat the unchanged cumulative values for that package and date. |
 | Cumulative … decreases (warning) | Correct it, or explain it (re-measurement, credit note) in the notes column. |
-| BAC in the file differs from settings | Make them equal, or clear the settings BAC. |
-| Missing monthly period (warning) | Add the period or set the reporting frequency to Irregular. |
-| App will not start | Check `python -m pip install -r requirements.txt` completed; run from the `evm_dashboard` folder. |
+| Only one reporting date in this data | Upload more reporting periods to see trends; snapshot values are still correct. |
 | Edits disappeared | Session state is not saved; export the workbook before closing. |
 
-# 11. Assumptions and limitations (summary)
+# 8. Assumptions and limitations
 
-Forecasts hold only under their stated assumptions. SPI is a budget-value measure and does not show critical-path delay. One baseline and one currency per dataset. Rounded percentage inputs lose precision. All bundled data is synthetic. The full list is in `documentation/assumptions_and_limitations.md`.
-
-### Performance and problem areas (Overview tab)
-
-One panel shows the S-curve beside the combined CPI and SPI trend, then, for work-package data:
-
-- **Work package status**: CPI, SPI and a status for each work package at the selected date, using the sidebar thresholds (worst of CPI and SPI; "Not started" when nothing is planned, earned or spent).
-- **Top problem activities**: the five work packages with the largest shortfall, ranked by the more negative of CV and SV, with the main issue (over budget or behind schedule).
-
-For project-level data the panel shows the two charts and explains that the tables need work-package data.
-
-### Uploading your own file: the smart reader
-
-Upload the file as it is; it does not need to match the template. The smart reader (rule-based, works offline, no AI service) then shows **what it understood** before anything is calculated:
-
-- **Data type** detected from your columns (you can change it).
-- **Header row** found even when titles or notes sit above the table; a **status date** written above the table (e.g. "Status date: 28-Feb-2025") becomes the reporting date of every row.
-- **Fixed automatically**, each listed so you can check it: total/summary rows removed, percentages stored as fractions (0.75) converted to 75 %, amounts written as "137 lakh" or "4 crore" converted.
-- **Column matches** with a confidence (High / Medium / Low) and the reason. A column is matched only when both its header and its values fit; unknown columns are listed as not used and are never guessed. A bare "% Complete" (MS Project, duration-based) is not used as physical progress.
-- **Your own PV / EV columns**: in progress and work-package data the dashboard calculates PV = budget × planned % and EV = budget × actual %. If your file also has PV or EV columns, they are compared row by row: a green message confirms they match; otherwise each differing activity is listed with both values.
-- **Missing data**: if a required column is absent (often actual cost), type the values in the table shown, or download your file with the column added, fill it in Excel and upload it again.
-
-Then check the project settings and the validation result, and open the dashboard. Validation messages give the row number of your original spreadsheet.
+Forecasts hold only under their stated assumptions. SPI is a budget-value measure: it does not show critical-path delay and tends to 1.00 at completion even for late projects. One baseline and one currency per dataset; no re-baselining. The smart reader recognises common layouts, not every possible file; always check what it reports. The manual check case rounds percentages to 2 decimals (PV/EV within €4 of the recorded values). Full list: `documentation/assumptions_and_limitations.md`.

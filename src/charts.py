@@ -67,10 +67,9 @@ def _date_axis(fig: go.Figure, dates) -> None:
         fig.update_xaxes(tickformat="%b %Y")
     if len(ds) == 1:
         fig.update_xaxes(range=[ds[0] - pd.Timedelta(days=20), ds[0] + pd.Timedelta(days=20)])
-        fig.add_annotation(text=ONE_DATE_NOTE, xref="paper", yref="paper", x=0.5, y=0.97, showarrow=False,
-                           yanchor="top", align="center",
-                           font=dict(size=12, color=MUTED), bgcolor="rgba(246,247,245,0.92)",
-                           bordercolor="#D5DAE0", borderpad=8)
+        # Shown under the axis, where it cannot cover the BAC / EAC / status-date labels inside the plot.
+        fig.update_xaxes(title_text=ONE_DATE_NOTE, title_font=dict(size=12, color=MUTED), title_standoff=10)
+        fig.update_layout(margin_b=78)
 
 
 def with_gap_breaks(df: pd.DataFrame, frequency: str) -> pd.DataFrame:

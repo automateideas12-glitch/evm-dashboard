@@ -3,7 +3,7 @@ title: "EVM Dashboard — Validation Report"
 subtitle: "CE 725 Construction Economics and Finance · Course project, Topic 7"
 ---
 
-**Status of this report.** All test results below come from actual runs on 21-Oct-2026 (evidence: `reports/test_results.txt`, `reports/benchmark_comparison.md`, `reports/browser_test_log.txt`). The independent benchmark calculations were prepared with AI assistance (Claude) separately from the dashboard code. **The course requires the team to verify every number against a manual benchmark; the Validation Engineer must redo Section 4 on paper and sign Section 15 before submission.** Until then, Section 4 is "prepared, awaiting team verification".
+**Status of this report.** Part A (synthetic benchmark) results come from runs on 21-Oct-2026; Part B (real-data benchmark, Section 6B), the defects D7–D16 and the updated test counts come from runs on 29-Oct-2026 (evidence: `reports/test_results.txt`, `reports/benchmark_comparison.md`, `reports/manual_check_comparison.md`, `reports/browser_test_log.txt`, `reports/browser_smart_reader_log.txt`). The independent benchmark calculations were prepared with AI assistance (Claude) separately from the dashboard code. **The course requires the team to verify every number against a manual benchmark; the Validation Engineer must redo Section 4 on paper and sign Section 15 before submission.** Until then, Section 4 is "prepared, awaiting team verification".
 
 # 1. Validation objective
 
@@ -127,6 +127,58 @@ Full table (work-package input mode; the other two modes give identical results)
 | TCPI_EAC | C | 2026-02-28 | 1.0000000000 | 1.0000000000 | 0.00e+00 | 1e-09 | PASS |
 
 
+# 6B. Part B — real-data benchmark: the manual check case
+
+**Why a second benchmark.** The Part A benchmark is synthetic. Part B repeats the validation on a **real** project, small enough to work by hand, and adds something a synthetic case cannot: the real final cost is known, so the forecasts themselves can be checked.
+
+**Project.** IJzertoren Memorial Square, Diksmuide, Belgium (civil works, 2013–14), project C2015-33 of the DSLIB empirical database, Ghent University (Batselier & Vanhoucke, 2015). Its 12 activities, recorded in the project-control software ProTrack, were grouped into 4 work packages by trade (`tools/build_manual_check_case.py`): WP budget = sum of activity budgets; planned % = sum of activity PV ÷ WP budget; actual % = sum of activity EV ÷ WP budget; AC = sum of activity AC. Percentages were rounded to 2 decimals so the case can be worked with a calculator. BAC €214,417.71; baseline 14-Oct-2013 to 20-Dec-2013; five month-end reports; the project finished on 28-Feb-2014 at €224,789.67 (4.8 % over budget, about 2 months late).
+
+**Agreement with the recorded values.** The 4-package file reproduces ProTrack's own project PV, EV and AC within €3.79 (largest difference, caused only by the 2-decimal rounding; proven bound 0.005 % × BAC = €10.72), and its CPI and SPI to within 0.0005, for all five reports (`tests/test_manual_check_case.py::test_reproduces_protrack_recorded_values`).
+
+**Inputs for the two benchmark periods** (from `data/real/C2015-33_ijzertoren_manual_check_work_packages.csv`):
+
+| Work package | Budget (€) | 30-Nov planned % | 30-Nov actual % | 30-Nov AC (€) | 31-Dec planned % | 31-Dec actual % | 31-Dec AC (€) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| WP1 Demolition and sewerage | 49,231.67 | 100.00 | 92.31 | 38,459.62 | 100.00 | 100.00 | 39,821.67 |
+| WP2 Earthworks and foundations | 58,025.66 | 100.00 | 32.64 | 50,759.94 | 100.00 | 58.03 | 69,412.98 |
+| WP3 Kerbs, paving and concrete | 78,356.70 | 5.75 | 12.40 | 10,271.32 | 100.00 | 22.27 | 40,197.69 |
+| WP4 Finishing (street furniture, signage) | 28,803.68 | 0.00 | 19.74 | 6,201.39 | 100.00 | 39.49 | 7,162.11 |
+| **Total (BAC)** | **214,417.71** | | | | | | |
+
+**Manual working — 30-Nov-2013 (period 2)**
+
+- PV = 49,231.67 + 58,025.66 + 78,356.70×0.0575 + 0 = 49,231.67 + 58,025.66 + 4,505.51 = **€111,762.84**
+- EV = 49,231.67×0.9231 + 58,025.66×0.3264 + 78,356.70×0.1240 + 28,803.68×0.1974 = 45,445.75 + 18,939.58 + 9,716.23 + 5,685.85 = **€79,787.41**
+- AC = 38,459.62 + 50,759.94 + 10,271.32 + 6,201.39 = **€105,692.27**
+- CV = 79,787.41 − 105,692.27 = **−€25,904.86**; SV = 79,787.41 − 111,762.84 = **−€31,975.43**
+- CPI = 79,787.41 / 105,692.27 = **0.754903**; SPI = 79,787.41 / 111,762.84 = **0.713899**
+- EAC A = 214,417.71 / 0.754903 = **€284,033.47**; EAC B = 105,692.27 + 134,630.30 / (0.754903 × 0.713899) = **€355,505.12**; EAC C = 105,692.27 + 134,630.30 = **€240,322.57**
+- ETC A = 284,033.47 − 105,692.27 = €178,341.20; VAC A = −€69,615.76; forecast overrun A = **32.47 %**
+- TCPI to BAC = (214,417.71 − 79,787.41) / (214,417.71 − 105,692.27) = 134,630.30 / 108,725.44 = **1.238259**
+- Work-package view: WP4 has value earned before any was planned (PV = 0), so its SPI is **undefined** and its status is *Insufficient data*; WP2 CPI = 18,939.58 / 50,759.94 = **0.373** (Critical).
+
+**Manual working — 31-Dec-2013 (period 3, about half complete)**
+
+- PV = BAC = **€214,417.71** (the baseline finish, 20-Dec-2013, has passed)
+- EV = 49,231.67 + 58,025.66×0.5803 + 78,356.70×0.2227 + 28,803.68×0.3949 = 49,231.67 + 33,672.29 + 17,450.04 + 11,374.57 = **€111,728.57**
+- AC = 39,821.67 + 69,412.98 + 40,197.69 + 7,162.11 = **€156,594.45**
+- CV = **−€44,865.88**; SV = **−€102,689.14**; CPI = **0.713490**; SPI = **0.521079**; % complete = 52.11 %
+- EAC A = **€300,519.58**; EAC B = **€432,800.41**; EAC C = **€259,283.59**; TCPI to BAC = 102,689.14 / 57,823.26 = **1.775914**
+- Identity checks: TCPI to EAC A = CPI = 0.713490 ✓; TCPI to EAC C = 1 ✓.
+
+**Comparison.** `benchmark/compare_manual_check_case.py` compares the hand-calculation workbook (`data/manual_check/IJzertoren_manual_check_workbook.xlsx`, Excel formulas only, 502 formulas, 0 errors) with the dashboard for **all five reports**: **90 values compared, 90 PASS, 0 FAIL** (money ±€0.01, indices ±10⁻⁹; full table in `reports/manual_check_comparison.md`). The automated test also compares every work package's PV, EV, AC, CV, SV, CPI, SPI and status at every date. On screen, the dashboard shows CPI 0.755 / SPI 0.714 / EAC (A) €284,033 for 30-Nov (interface test `test_manual_check_case_at_the_two_benchmark_dates`) and CPI 0.713 / SPI 0.521 / EAC (A) €300,520 for 31-Dec (interface test and browser screenshot `reports/screenshots/m_overview.png`), matching the working above.
+
+**Forecast check (only possible with real data).** Each forecast compared with the real final cost of €224,789.67:
+
+| Report | % complete | EAC A | EAC B | EAC C | Error A | Error B | Error C |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 31-Oct-2013 | 15.5 % | 188,834 | 322,625 | 210,445 | −16.0 % | +43.5 % | −6.4 % |
+| 30-Nov-2013 | 37.2 % | 284,033 | 355,505 | 240,323 | +26.4 % | +58.2 % | +6.9 % |
+| 31-Dec-2013 | 52.1 % | 300,520 | 432,800 | 259,284 | +33.7 % | +92.5 % | +15.3 % |
+| 31-Jan-2014 | 88.9 % | 219,115 | 222,161 | 218,593 | −2.5 % | −1.2 % | −2.8 % |
+
+**What this shows.** The formulas are correct (Part A and Part B), yet the forecasts are poor until late in this project, because most of the overspend happened early and the project then recovered (CPI rose from 0.71 to 0.98). Method B, which assumes schedule pressure costs extra, was the most pessimistic. This supports the dashboard's design choice to show all methods side by side, to label every EAC as an assumption-based forecast, and not to present any one method as "the" answer. A second real project, the apartment building C2014-05 cut at 50 % complete (`data/real/forecast_test/`; the 50 % report is interpolated between two real reports and labelled as such), shows the same ordering: the dashboard reproduces the answer key exactly, and the forecast errors are A +7.0 %, B +32.5 %, C −1.5 % (`tests/test_forecast_at_50pct.py`).
+
 # 7. Discrepancies and defects found
 
 No numerical discrepancy was found between the manual benchmark and the dashboard (maximum |difference| = ₹7.5×10⁻⁹, floating-point representation). Because a first-run match does not prove the tests can detect errors, mutation testing was performed (Section 12). The following genuine defects and findings arose during development and testing:
@@ -139,10 +191,20 @@ No numerical discrepancy was found between the manual benchmark and the dashboar
 | D4 | Screenshot review | A warning named the internal field `planned_pct` instead of the user's column `planned_progress_pct` | Internal column name passed as field label | Mapped to user-facing names | Pass |
 | D5 | Data generation | Progress-based demo file EV for 31-Aug-2026 = ₹7,02,50,000.40 vs ₹7,02,50,000 from WP data | Percentages stored to 6 decimals | Not a code defect; documented as limitation (rounded % inputs lose precision) | Recorded |
 | D6 | Screenshot review | Signboard clipped, KPI labels truncated, BAC/EAC chart labels overlapping, CPI/SPI axis cutting off the 1.00 line, preview dates showing "00:00:00" | Layout defaults | Labels shortened, annotations repositioned, axis range includes 1.00 and the critical line, dates formatted | Pass (screenshots in `reports/screenshots/`) |
+| D7 | Team's own site sheet (`tests/fixtures/site_status_sheet.xlsx`) | Upload unusable: header on row 4 read as data, status date above the table ignored, 0.75 read as 0.75 %, "Project totals" row read as an activity | Reader assumed a template-shaped file | Smart reader (`src/smart_reader.py`): header detection, status date from the cell above, fraction and lakh/crore conversion, summary-row removal — every change listed on screen | Pass: 38 tests; BAC and PV equal the sheet's own totals |
+| D8 | Unit test | Validation messages numbered rows 1, 2, 3… instead of the real spreadsheet rows | Row numbers assigned after cleaning | Smart reader passes original row numbers to validation | Pass: A03 reported on row 7 |
+| D9 | Team upload (Prashant's sheet) | Supplied PV/EV columns flagged "not needed" plus a validation warning, which looked like an error | Unused columns reported, not checked | Supplied PV/EV cross-checked row by row against budget × progress %; differences named per activity | Pass: all 12 match; mismatch test |
+| D10 | Team screenshot | One-date file: charts nearly empty, same date repeated six times on the x-axis | Automatic date ticks on a single point | One label per reporting date; explicit "only one reporting date" note | Pass: `tests/test_charts.py` |
+| D11 | Team usability feedback | Home button, reporting date and forecast method hidden in the collapsible sidebar | Layout | Always-visible top bar; sidebar keeps display settings | Pass: app tests |
+| D12 | App test (AI error) | The AI's summary of the manual check case gave CPI at 31-Dec-2013 as 0.714; correct value 0.71349 → 0.713 | Rounding slip in the AI's prose, not in the code | Test expectation and documents corrected | Pass |
+| D13 | Test design | First ProTrack-agreement test used a guessed €3 tolerance; observed difference €3.79 | Tolerance not derived | Replaced by the proven rounding bound (0.005 % × BAC = €10.72) | Pass |
+| D14 | Screenshot automation | A styling rule targeted a page element that does not exist in Streamlit 1.66, so the panel had no card styling | Element name from an older version | Panel given an explicit key and styled by it | Pass (screenshots) |
+| D15 | Browser automation | Values typed into the entry table at machine speed were partly lost | Test typed while the page was still updating | Test types at human pace (waits after each entry); both input paths then pass | Pass: 13/13 checks (`reports/browser_smart_reader_log.txt`) |
+| D16 | Screenshot review (one-date upload) | The "only one reporting date" note, drawn as a box inside the plot, covered the BAC, EAC, status-date and "1.00 = on plan" labels | Note placed inside the plot area (D10 fix) | Note moved under the date axis; test now requires it there and not inside the plot | Pass: `tests/test_charts.py`; `reports/screenshots/m_one_date.png` |
 
 # 8–10. Root causes, corrections and retest
 
-Given per defect in Section 7. After all corrections the complete suite was rerun: **79 passed, 0 failed** (`reports/test_results.txt`), and the browser run was repeated (`reports/browser_test_log.txt`).
+Given per defect in Section 7. After all corrections the complete suite was rerun on 29-Oct-2026: **164 passed, 0 failed** (`reports/test_results.txt`), and both browser runs were repeated (`reports/browser_test_log.txt`, `reports/browser_smart_reader_log.txt`).
 
 # 11. Edge-case and workflow testing
 
@@ -169,7 +231,12 @@ Given per defect in Section 7. After all corrections the complete suite was reru
 | Manual entry → load (browser) | Benchmark P2 values reproduced | browser log | Pass |
 | Editing a single cell in the manual table (browser) | Edit re-validates | Scripted edit did not register in the canvas grid | **Not verified** — team to check by hand (2 min): change an AC to −5 and confirm a blocking error appears |
 | Upload ↔ manual entry equivalence | Identical results | `test_manual_entry_and_upload_give_identical_results` | Pass |
-| Older library versions | Suite passes | pandas 2.2.3 / Streamlit 1.50 / Plotly 5.24 venv: 79 passed | Pass |
+| Older library versions | Suite passes | pandas 2.2.3 / Streamlit 1.50 / Plotly 5.24 venv: 79 passed (21-Oct; not repeated after later changes) | Pass (21-Oct) |
+| Messy site sheet: title rows, status date above table, fractions, totals row, no AC | Understood; AC requested | `tests/test_smart_reader.py`; browser log (two entry paths) | Pass |
+| Odd headers, ₹ signs, "137 lakh", dd/mm dates, semicolons, Primavera BCWS/BCWP/ACWP, cover sheet | Mapped correctly; unknown columns not guessed | `tests/test_smart_reader.py` | Pass |
+| Supplied PV/EV that disagree with budget × % | Each differing row named; warning kept | `test_supplied_ev_that_disagrees_is_reported_by_activity` | Pass |
+| Single reporting date | Charts labelled once, note shown | `tests/test_charts.py` | Pass |
+| Work package with value earned before it was planned (PV = 0) | SPI undefined, status "Insufficient data" | manual check case, 30-Nov-2013 | Pass |
 
 # 12. Mutation testing (can the tests catch typical errors?)
 
@@ -185,18 +252,18 @@ Each error below was injected into a temporary copy of the code; the suite was r
 | Period AC used as if cumulative | 1 |
 | CPI returned as 0 when AC = 0 | 2 |
 
-All seven were detected.
+All seven were detected. Faults injected into later code (27–29 Oct 2026) were also all detected: smart reader 10/10 (e.g. header always row 1, fractions not converted, baseline start accepted as status date, content check skipped), PV/EV cross-check 3/3, home screen and work-package analysis 7/7, charts and top bar 6/6 (e.g. dates not labelled, amber zone missing, Home only in the sidebar, method B formula changed — caught by the real-data workbook comparison).
 
 # 13. Remaining limitations of the validation
 
-- One synthetic benchmark (two periods) — not a real project; practitioner review is still recommended.
+- Two benchmarks: one synthetic (Part A) and one real project grouped into 4 work packages with 2-decimal percentages (Part B). Practitioner review is still recommended.
 - Method D (independent ETC) is checked by unit and interface tests, not by the paper benchmark (it is a user input, not a formula).
 - Charts and commentary were checked by inspection and interface tests, not against an independent reference.
 - Manual-table cell editing in the browser not verified by automation (Section 11).
 
 # 14. Conclusion
 
-For the benchmark case, all 54 benchmark values per input mode (162 comparisons) match the independently prepared results within one paisa / 10⁻⁹, with no discrepancies; undefined and edge cases are reported as undefined or flagged rather than shown as numbers; and the test suite detects all seven typical formula errors injected. Subject to the team's own paper verification (Section 15), the calculation engine is considered validated for the scope tested.
+For the synthetic benchmark, all 54 values per input mode (162 comparisons) match the independently prepared results within one paisa / 10⁻⁹, with no discrepancies; undefined and edge cases are reported as undefined or flagged rather than shown as numbers; and the test suite detects all seven typical formula errors injected. For the real-data benchmark, the hand-calculation workbook and the dashboard agree on all 90 values for all five reports, and the data reproduces the values recorded in ProTrack. The real project also shows that correct formulas can still give poor forecasts early in a project, which the dashboard communicates by showing all methods and labelling them as assumption-based. Subject to the team's own paper verification (Section 15), the calculation engine is considered validated for the scope tested.
 
 # 15. Team verification sign-off
 
@@ -204,6 +271,7 @@ For the benchmark case, all 54 benchmark values per input mode (162 comparisons)
 |---|---|---|---|
 | Period 1 recalculated on paper without the tool; matches Section 4 | | | |
 | Period 2 recalculated on paper without the tool; matches Section 4 | | | |
-| `python -m pytest` run on a team laptop: 79 passed | | | |
+| Part B: 30-Nov-2013 and 31-Dec-2013 recalculated on paper from the input table in Section 6B; matches | | | |
+| `python -m pytest` run on a team laptop: 164 passed | | | |
 | Manual-table cell edit check (Section 11) done | | | |
 | Any discrepancy found by the team recorded here and in the AI usage log | | | |
